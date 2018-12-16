@@ -5,41 +5,38 @@ use std::sync::Arc;
 use std::thread;
 use std::time;
 
-pub struct BusReader<T: Display + Default + Clone> {
+pub struct BusReader<T: Display + Default> {
     buffer: Arc<Vec<AtomicPtr<T>>>,
     wi: Arc<AtomicUsize>,
     ri: usize,
     size: usize,
 }
-impl<T: Display + Default + Clone> BusReader<T> {
-    pub fn recv(&mut self) -> Option<T> {
+impl<T: Display + Default> BusReader<T> {
+    pub fn recv(&mut self) -> Option<&T> {
         if self.ri == self.wi.load(Ordering::Relaxed) {
             return None;
         }
         let mut object;
         loop {
-            let temp = self
-                .buffer
-                .get(self.ri % self.size)
-                .unwrap();
+            let temp = self.buffer.get(self.ri % self.size).unwrap();
             object = unsafe { &*temp.load(Ordering::Relaxed) };
             if self.wi.load(Ordering::Relaxed) > self.ri + self.size {
                 self.ri = self.wi.load(Ordering::Relaxed) - self.size;
             } else {
-                self.ri+=1;
-                return Some(object.clone());
+                self.ri += 1;
+                return Some(object);
             }
         }
     }
 }
-pub struct Bus<T: Display + Default + Clone> {
+pub struct Bus<T: Display + Default> {
     // atp to an array of atps of option<arc<t>>
     buffer: Arc<Vec<AtomicPtr<T>>>,
     wi: Arc<AtomicUsize>,
     size: usize,
 }
 
-impl<T: Display + Default + Clone> Bus<T> {
+impl<T: Display + Default> Bus<T> {
     pub fn new(size: usize) -> Self {
         let mut temp: Vec<AtomicPtr<T>> = Vec::new();
         for _i in 0..size {
@@ -82,7 +79,7 @@ impl<T: Display + Default + Clone> Bus<T> {
         let temp = &*self.buffer;
         println!("******print********{}", temp.len());
         for (index, object) in temp.into_iter().enumerate() {
-            let me = unsafe { &*object.load(Ordering::Relaxed) }.clone();
+            let me = unsafe { &*object.load(Ordering::Relaxed) };
             println!("{} : Some({})", index, me);
         }
         println!("******print********");
