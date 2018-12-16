@@ -130,7 +130,7 @@ fn main() {
             thread::sleep(time::Duration::from_millis(1000));
         }
     });
-    a.join();
-    b.join();
-    c.join();
+    a.join().unwrap();
+    b.join().unwrap();
+    c.join().unwrap();
 }
