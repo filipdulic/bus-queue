@@ -1,0 +1,6 @@
+[package]
+name = "bus-test"
+version = "0.1.0"
+authors = ["Filip Dulic <filip.dulic@tradecore.com>"]
+
+[dependencies]
