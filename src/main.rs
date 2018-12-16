@@ -8,28 +8,25 @@ use std::time;
 pub struct BusReader<T: Display + Default + Clone> {
     buffer: Arc<Vec<AtomicPtr<T>>>,
     wi: Arc<AtomicUsize>,
-    ri: AtomicUsize,
+    ri: usize,
     size: usize,
 }
 impl<T: Display + Default + Clone> BusReader<T> {
-    pub fn recv(&self) -> Option<T> {
-        if self.ri.load(Ordering::Relaxed) == self.wi.load(Ordering::Relaxed) {
+    pub fn recv(&mut self) -> Option<T> {
+        if self.ri == self.wi.load(Ordering::Relaxed) {
             return None;
         }
         let mut object;
         loop {
             let temp = self
                 .buffer
-                .get(self.ri.load(Ordering::Relaxed) % self.size)
+                .get(self.ri % self.size)
                 .unwrap();
             object = unsafe { &*temp.load(Ordering::Relaxed) };
-            if self.wi.load(Ordering::Relaxed) > self.ri.load(Ordering::Relaxed) + self.size {
-                self.ri.store(
-                    self.wi.load(Ordering::Relaxed) - self.size,
-                    Ordering::Relaxed,
-                );
+            if self.wi.load(Ordering::Relaxed) > self.ri + self.size {
+                self.ri = self.wi.load(Ordering::Relaxed) - self.size;
             } else {
-                self.ri.fetch_add(1, Ordering::Relaxed);
+                self.ri+=1;
                 return Some(object.clone());
             }
         }
@@ -66,7 +63,7 @@ impl<T: Display + Default + Clone> Bus<T> {
         BusReader {
             buffer: self.buffer.clone(),
             wi: self.wi.clone(),
-            ri: AtomicUsize::new(0),
+            ri: 0,
             size: self.size,
         }
     }
@@ -94,8 +91,8 @@ impl<T: Display + Default + Clone> Bus<T> {
 
 fn main() {
     let bus: Bus<u32> = Bus::new(10);
-    let rx1 = bus.add_sub();
-    let rx2 = bus.add_sub();
+    let mut rx1 = bus.add_sub();
+    let mut rx2 = bus.add_sub();
     let a = thread::spawn(move || {
         let mut vec = Vec::new();
         for i in 0..40 {
