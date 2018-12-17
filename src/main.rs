@@ -1,25 +1,27 @@
+extern crate crossbeam;
+
+use crossbeam::atomic::ArcCell;
 use std::default::Default;
 use std::fmt::Display;
-use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time;
 
 pub struct BusReader<T: Display + Default> {
-    buffer: Arc<Box<[AtomicPtr<T>]>>,
+    buffer: Arc<Box<[ArcCell<T>]>>,
     wi: Arc<AtomicUsize>,
     ri: usize,
     size: usize,
 }
 impl<T: Display + Default> BusReader<T> {
-    pub fn recv(&mut self) -> Option<&T> {
+    pub fn recv(&mut self) -> Option<Arc<T>> {
         if self.ri == self.wi.load(Ordering::Relaxed) {
             return None;
         }
-        let mut object;
+        let mut object: Arc<T>;
         loop {
-            let temp = &self.buffer[self.ri % self.size];
-            object = unsafe { &*temp.load(Ordering::Relaxed) };
+            object = self.buffer[self.ri % self.size].get();
             if self.wi.load(Ordering::Relaxed) > self.ri + self.size {
                 self.ri = self.wi.load(Ordering::Relaxed) - self.size;
             } else {
@@ -31,16 +33,16 @@ impl<T: Display + Default> BusReader<T> {
 }
 pub struct Bus<T: Display + Default> {
     // atp to an array of atps of option<arc<t>>
-    buffer: Arc<Box<[AtomicPtr<T>]>>,
+    buffer: Arc<Box<[ArcCell<T>]>>,
     wi: Arc<AtomicUsize>,
     size: usize,
 }
 
 impl<T: Display + Default> Bus<T> {
     pub fn new(size: usize) -> Self {
-        let mut temp: Vec<AtomicPtr<T>> = Vec::new();
+        let mut temp: Vec<ArcCell<T>> = Vec::new();
         for _i in 0..size {
-            temp.push(AtomicPtr::new(&mut T::default()));
+            temp.push(ArcCell::new(Arc::new(T::default())));
         }
 
         Self {
@@ -57,20 +59,20 @@ impl<T: Display + Default> Bus<T> {
             size: self.size,
         }
     }
-    pub fn push(&self, object: &mut T) {
+    pub fn push(&self, object: T) {
         //println!("pushed");
 
         let temp = &*self.buffer;
 
-        let temp = &temp[self.wi.load(Ordering::Relaxed) % self.size];
-        temp.store(object, Ordering::Relaxed);
+        let temp: &ArcCell<T> = &temp[self.wi.load(Ordering::Relaxed) % self.size];
+        temp.set(Arc::new(object));
         self.wi.fetch_add(1, Ordering::Relaxed);
     }
     pub fn print(&self) {
         let temp = &self.buffer;
         println!("******print********{}", temp.len());
         for (index, object) in temp.into_iter().enumerate() {
-            let me = unsafe { &*object.load(Ordering::Relaxed) };
+            let me = object.get();
             println!("{} : Some({})", index, me);
         }
         println!("******print********");
@@ -87,9 +89,9 @@ fn main() {
             vec.push(i);
         }
         thread::sleep(time::Duration::from_millis(2000));
-        for i in &mut vec {
+        for i in vec {
             bus.push(i);
-            //bus.print();
+            bus.print();
             thread::sleep(time::Duration::from_millis(500));
         }
     });
@@ -98,7 +100,7 @@ fn main() {
         thread::sleep(time::Duration::from_millis(1000));
         for _i in 0..100 {
             match rx1.recv() {
-                None => (),//println!("b: Got none weird!"),
+                None => (), //println!("b: Got none weird!"),
                 Some(ref arc_obj) => println!("b: {}", arc_obj),
             }
             thread::sleep(time::Duration::from_millis(100));
@@ -109,7 +111,7 @@ fn main() {
         thread::sleep(time::Duration::from_millis(1000));
         for _i in 0..100 {
             match rx2.recv() {
-                None => (),//println!("c: Got none weird!"),
+                None => (), //println!("c: Got none weird!"),
                 Some(ref arc_obj) => println!("c: {}", arc_obj),
             }
             thread::sleep(time::Duration::from_millis(1000));
