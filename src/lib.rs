@@ -5,7 +5,7 @@ use std::fmt::Display;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 pub struct BusReader<T: Display> {
-    buffer: Arc<Box<[ArcSwapOption<T>]>>,
+    buffer: Arc<Vec<ArcSwapOption<T>>>,
     wi: Arc<AtomicUsize>,
     ri: usize,
     size: usize,
@@ -17,7 +17,7 @@ impl<T: Display> BusReader<T> {
             return None;
         }
         loop {
-            match self.buffer[self.ri % self.size].load() {
+            match self.buffer.get(self.ri % self.size).unwrap().load() {
                 None => return None,
                 Some(some) => {
                     if self.wi.load(Ordering::Relaxed) > self.ri + self.size {
@@ -34,7 +34,7 @@ impl<T: Display> BusReader<T> {
 
 pub struct Bus<T: Display> {
     // atp to an array of atps of option<arc<t>>
-    buffer: Arc<Box<[ArcSwapOption<T>]>>,
+    buffer: Arc<Vec<ArcSwapOption<T>>>,
     wi: Arc<AtomicUsize>,
     size: usize,
 }
@@ -45,7 +45,7 @@ impl<T: Display> Bus<T> {
         temp.resize(size, ArcSwapOption::new(None));
 
         Self {
-            buffer: Arc::new(temp.into_boxed_slice()),
+            buffer: Arc::new(temp),
             wi: Arc::new(AtomicUsize::new(0)),
             size: size,
         }
@@ -59,18 +59,18 @@ impl<T: Display> Bus<T> {
         }
     }
     pub fn push(&self, object: T) {
-        self.buffer[self.wi.load(Ordering::Relaxed) % self.size].store(Some(Arc::new(object)));
+        self.buffer
+            .get(self.wi.load(Ordering::Relaxed) % self.size)
+            .unwrap()
+            .store(Some(Arc::new(object)));
         self.wi.fetch_add(1, Ordering::Relaxed);
     }
     pub fn print(&self) {
-        let temp = &self.buffer;
-        println!("******print********{}", temp.len());
-        for (index, object) in temp.into_iter().enumerate() {
+        for (index, object) in self.buffer.iter().enumerate() {
             match object.load() {
                 None => println!("{} : None", index),
                 Some(some) => println!("{} : Some({})", index, some),
             }
         }
-        println!("******print********");
     }
 }
