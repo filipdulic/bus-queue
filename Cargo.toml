@@ -1,7 +1,11 @@
 [package]
-name = "bus-test"
+name = "bus"
 version = "0.1.0"
 authors = ["Filip Dulic <filip.dulic@tradecore.com>"]
 
 [dependencies]
 arc-swap = "0.3.6"
+
+[[example]]
+name = "pubsub"
+path = "examples/pubsub.rs"
