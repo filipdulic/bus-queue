@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 /// Provides an interface for subscribers
+///
 /// Every BusReader that can keep up with the push frequency should recv every pushed object.
 /// BusReaders unable to keep up will miss object once the writer's index wi is larger then
 /// reader's index ri + size
