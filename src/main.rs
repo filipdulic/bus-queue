@@ -1,6 +1,6 @@
-extern crate crossbeam;
+extern crate arc_swap;
 
-use crossbeam::atomic::ArcCell;
+use arc_swap::ArcSwap;
 use std::default::Default;
 use std::fmt::Display;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -9,7 +9,7 @@ use std::thread;
 use std::time;
 
 pub struct BusReader<T: Display + Default> {
-    buffer: Arc<Box<[ArcCell<T>]>>,
+    buffer: Arc<Box<[ArcSwap<T>]>>,
     wi: Arc<AtomicUsize>,
     ri: usize,
     size: usize,
@@ -21,7 +21,7 @@ impl<T: Display + Default> BusReader<T> {
         }
         let mut object: Arc<T>;
         loop {
-            object = self.buffer[self.ri % self.size].get();
+            object = self.buffer[self.ri % self.size].load();
             if self.wi.load(Ordering::Relaxed) > self.ri + self.size {
                 self.ri = self.wi.load(Ordering::Relaxed) - self.size;
             } else {
@@ -33,16 +33,16 @@ impl<T: Display + Default> BusReader<T> {
 }
 pub struct Bus<T: Display + Default> {
     // atp to an array of atps of option<arc<t>>
-    buffer: Arc<Box<[ArcCell<T>]>>,
+    buffer: Arc<Box<[ArcSwap<T>]>>,
     wi: Arc<AtomicUsize>,
     size: usize,
 }
 
 impl<T: Display + Default> Bus<T> {
     pub fn new(size: usize) -> Self {
-        let mut temp: Vec<ArcCell<T>> = Vec::new();
+        let mut temp: Vec<ArcSwap<T>> = Vec::new();
         for _i in 0..size {
-            temp.push(ArcCell::new(Arc::new(T::default())));
+            temp.push(ArcSwap::from(Arc::new(T::default())));
         }
 
         Self {
@@ -60,19 +60,14 @@ impl<T: Display + Default> Bus<T> {
         }
     }
     pub fn push(&self, object: T) {
-        //println!("pushed");
-
-        let temp = &*self.buffer;
-
-        let temp: &ArcCell<T> = &temp[self.wi.load(Ordering::Relaxed) % self.size];
-        temp.set(Arc::new(object));
+        self.buffer[self.wi.load(Ordering::Relaxed) % self.size].store(Arc::new(object));
         self.wi.fetch_add(1, Ordering::Relaxed);
     }
     pub fn print(&self) {
         let temp = &self.buffer;
         println!("******print********{}", temp.len());
         for (index, object) in temp.into_iter().enumerate() {
-            let me = object.get();
+            let me = object.load();
             println!("{} : Some({})", index, me);
         }
         println!("******print********");
