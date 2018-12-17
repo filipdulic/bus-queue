@@ -1,5 +1,5 @@
 [package]
-name = "bus"
+name = "bus_queue"
 version = "0.1.0"
 authors = ["Filip Dulic <filip.dulic@tradecore.com>"]
 

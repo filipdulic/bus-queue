@@ -1,6 +1,6 @@
-extern crate bus;
+extern crate bus_queue;
 
-use bus::Bus;
+use bus_queue::Bus;
 use std::thread;
 use std::time;
 
