@@ -2,7 +2,8 @@
 name = "bus_queue"
 version = "0.1.0"
 authors = ["Filip Dulic <filip.dulic@tradecore.com>"]
-
+description = "Lock free bounded non blocking pub sub queue"
+license = "Apache-2.0/MIT"
 [dependencies]
 arc-swap = "0.3.6"
 
