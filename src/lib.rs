@@ -1,3 +1,6 @@
+#[cfg(feature = "async")]
+extern crate futures;
+
 extern crate arc_swap;
 
 use arc_swap::ArcSwapOption;
@@ -78,5 +81,29 @@ impl<T> Bus<T> {
             .unwrap()
             .store(Some(Arc::new(object)));
         self.wi.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+#[cfg(feature = "async")]
+pub mod async {
+    use futures::prelude::*;
+
+    pub struct Test {
+        cnt: u32,
+    }
+    impl Test {
+        pub fn new()->Self {
+            Self { cnt: 0}
+        }
+    }
+
+    impl Stream for Test {
+        type Item = u32;
+        type Error = ();
+        fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+            self.cnt += 1;
+            Ok(Async::Ready(Some(self.cnt)))
+        }
+
     }
 }

@@ -6,9 +6,23 @@ description = "Lock free bounded non blocking pub sub queue"
 license = "Apache-2.0/MIT"
 keywords = ["pubsub", "lock-free", "queue"]
 repository = "https://github.com/filipdulic/bus-queue"
+
 [dependencies]
 arc-swap = "0.3.6"
+futures = {version = "0.1", optional = true}
+tokio = {version = "*", optional = true}
+
+[features]
+default = ["async"]
+async = ["futures"]
+async-example = ["tokio"]
 
 [[example]]
 name = "pubsub"
 path = "examples/pubsub.rs"
+
+[[example]]
+name = "async-pubsub"
+path = "examples/async-pubsub.rs"
+required-features = ["async-example"]
+
