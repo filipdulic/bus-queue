@@ -26,16 +26,15 @@ impl<T> BusReader<T> {
             return None;
         }
         loop {
-            match self.buffer.get(self.ri % self.size).unwrap().load() {
-                None => return None,
-                Some(some) => {
+            match self.buffer[self.ri % self.size].load() {
+                Some(some) =>
                     if self.wi.load(Ordering::Relaxed) > self.ri + self.size {
                         self.ri = self.wi.load(Ordering::Relaxed) - self.size;
                     } else {
                         self.ri += 1;
                         return Some(some);
-                    }
-                }
+                    },
+                None => unreachable!()
             }
         }
     }
