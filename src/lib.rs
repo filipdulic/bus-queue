@@ -81,7 +81,6 @@ impl<T> Bus<T> {
 
 #[cfg(feature = "async")]
 pub mod async {
-    use super::arc_swap::ArcSwap;
     use super::Arc;
     use super::{Bus, BusReader};
     use futures::prelude::*;
@@ -102,7 +101,7 @@ pub mod async {
                 Some(arc_object) => Ok(Ready(Some(arc_object))),
                 None => {
                     println!("got nothing");
-                    self.task_sender.send(current());
+                    self.task_sender.send(current()).unwrap();
                     Ok(NotReady)
                 }
             }
