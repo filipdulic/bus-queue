@@ -100,7 +100,6 @@ pub mod async {
             match self.reader.recv() {
                 Some(arc_object) => Ok(Ready(Some(arc_object))),
                 None => {
-                    println!("got nothing");
                     self.task_sender.send(current()).unwrap();
                     Ok(NotReady)
                 }
