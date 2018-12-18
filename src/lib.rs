@@ -1,7 +1,6 @@
 extern crate arc_swap;
 
 use arc_swap::ArcSwapOption;
-use std::fmt::Display;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -10,14 +9,14 @@ use std::sync::Arc;
 /// Every BusReader that can keep up with the push frequency should recv every pushed object.
 /// BusReaders unable to keep up will miss object once the writer's index wi is larger then
 /// reader's index ri + size
-pub struct BusReader<T: Display> {
+pub struct BusReader<T> {
     buffer: Arc<Vec<ArcSwapOption<T>>>,
     wi: Arc<AtomicUsize>,
     ri: usize,
     size: usize,
 }
 
-impl<T: Display> BusReader<T> {
+impl<T> BusReader<T> {
     /// Receives some atomic refrence to an object if queue is not empty, or None if it is
     pub fn recv(&mut self) -> Option<Arc<T>> {
         if self.ri == self.wi.load(Ordering::Relaxed) {
@@ -40,14 +39,14 @@ impl<T: Display> BusReader<T> {
 }
 
 /// Provides an interface for the publisher
-pub struct Bus<T: Display> {
+pub struct Bus<T> {
     // atp to an array of atps of option<arc<t>>
     buffer: Arc<Vec<ArcSwapOption<T>>>,
     wi: Arc<AtomicUsize>,
     size: usize,
 }
 
-impl<T: Display> Bus<T> {
+impl<T> Bus<T> {
     /// Instantiates the Bus struct, creating the initial buffer filled with None.
     /// # Arguments
     /// * `size` - a usize size of the internal circular buffer
@@ -79,14 +78,5 @@ impl<T: Display> Bus<T> {
             .unwrap()
             .store(Some(Arc::new(object)));
         self.wi.fetch_add(1, Ordering::Relaxed);
-    }
-    /// Prints the current state of the circular buffer
-    pub fn print(&self) {
-        for (index, object) in self.buffer.iter().enumerate() {
-            match object.load() {
-                None => println!("{} : None", index),
-                Some(some) => println!("{} : Some({})", index, some),
-            }
-        }
     }
 }

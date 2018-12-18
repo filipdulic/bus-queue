@@ -16,7 +16,6 @@ fn main() {
         thread::sleep(time::Duration::from_millis(2000));
         for i in vec {
             bus.push(i);
-            bus.print();
             thread::sleep(time::Duration::from_millis(500));
         }
     });
