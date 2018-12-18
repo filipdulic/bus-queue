@@ -5,7 +5,6 @@ extern crate tokio;
 use bus_queue::async::AsyncBus;
 use std::thread;
 use std::time;
-use thread::current;
 use tokio::prelude::*;
 
 fn main() {
@@ -16,10 +15,14 @@ fn main() {
         streams.push(async_bus.add_sub());
     }
     let mut vec = Vec::new();
-    for stream in streams {
+    for (index, stream) in streams.into_iter().enumerate() {
+        use std::fs::File;
+        use std::io::prelude::*;
+        let mut file = File::create(format!("fut_{}_log.txt", index)).unwrap();
         vec.push(thread::spawn(move || {
-            let future = stream.for_each(|curr| {
-                println!("fut {:?} : {}", current().id(), curr);
+            let future = stream.for_each(move |curr| {
+                writeln!(file, "{}\r", curr);
+                file.flush().unwrap();
                 futures::future::ok(())
             });
             tokio::run(future);
@@ -27,14 +30,14 @@ fn main() {
     }
     let a = thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(2000));
-        for i in 0..40 {
+        for i in 0..100 {
             async_bus.push(i);
-            thread::sleep(time::Duration::from_millis(500));
+            thread::sleep(time::Duration::from_millis(200));
         }
+        thread::sleep(time::Duration::from_millis(5000));
+        async_bus.push(100);
+        thread::sleep(time::Duration::from_millis(5000));
     });
 
     a.join().unwrap();
-    for th in vec {
-        th.join().unwrap();
-    }
 }
