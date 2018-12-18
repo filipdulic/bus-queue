@@ -27,14 +27,13 @@ impl<T> BusReader<T> {
         }
         loop {
             match self.buffer[self.ri % self.size].load() {
-                Some(some) =>
-                    if self.wi.load(Ordering::Relaxed) > self.ri + self.size {
-                        self.ri = self.wi.load(Ordering::Relaxed) - self.size;
-                    } else {
-                        self.ri += 1;
-                        return Some(some);
-                    },
-                None => unreachable!()
+                Some(some) => if self.wi.load(Ordering::Relaxed) > self.ri + self.size {
+                    self.ri = self.wi.load(Ordering::Relaxed) - self.size;
+                } else {
+                    self.ri += 1;
+                    return Some(some);
+                },
+                None => unreachable!(),
             }
         }
     }
@@ -74,7 +73,7 @@ impl<T> Bus<T> {
     /// Publishes values to the circular buffer at wi % size
     /// # Arguments
     /// * `object` - owned object to be published
-    pub fn push(&mut self, object: T) {
+    pub fn push(&self, object: T) {
         self.buffer[self.wi.load(Ordering::Relaxed) % self.size].store(Some(Arc::new(object)));
         self.wi.fetch_add(1, Ordering::Relaxed);
     }
@@ -82,13 +81,13 @@ impl<T> Bus<T> {
 
 #[cfg(feature = "async")]
 pub mod async {
-    use super::{Arc};
     use super::arc_swap::ArcSwap;
+    use super::Arc;
     use super::{Bus, BusReader};
     use futures::prelude::*;
     use futures::task::{current, Task};
     use futures::{Async::NotReady, Async::Ready};
-    use std::sync::mpsc::{channel,Receiver,Sender};
+    use std::sync::mpsc::{channel, Receiver, Sender};
 
     pub struct AsyncBusReader<T> {
         reader: BusReader<T>,
@@ -113,12 +112,12 @@ pub mod async {
     pub struct AsyncBus<T> {
         bus: Bus<T>,
         task_sender: Sender<Task>,
-        task_receiver: Receiver<Task>
+        task_receiver: Receiver<Task>,
     }
 
     impl<T> AsyncBus<T> {
         pub fn new(size: usize) -> Self {
-            let (tx,rx) = channel();
+            let (tx, rx) = channel();
             Self {
                 bus: Bus::new(size),
                 task_receiver: rx,
