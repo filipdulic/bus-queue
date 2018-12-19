@@ -8,8 +8,7 @@ The underlying data-structure is a vector of Arc(s) providing efficient use of m
 
 ##Features
 * Lock-Free Write/Read - Lock-Free for Publisher and Lock-Free for Subscribers.
-* Bounded - Constant size of memory used, max is `sizeof(MsgObject)* (queue_size + sub_cnt + 1)`...
-...This is the edge case where each subscriber is holding a ref to an object while the publisher has published a full length of queue in the mean time.
+* Bounded - Constant size of memory used, max is `sizeof(MsgObject)* (queue_size + sub_cnt + 1)`. This is an edge-case where each subscriber is holding a ref to an object while the publisher has published a full length of queue in the mean time.
 * Non-Blocking - The queue never blocks the publisher, slow subscribers miss data proportinal to their speed.
 * Pub-Sub - Every Subscriber that can keep up with the Publisher will recieve all the data the Publisher publishes.
 * Sync/Async - both interfaces are provided and can be mixed. For example you can publish with a sync Publisher, an recive with an async Subscriber, and vice-versa.
