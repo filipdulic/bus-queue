@@ -1,6 +1,5 @@
 use super::{Arc, Ordering::Relaxed};
 use super::{Bus, BusReader};
-use super::arc_swap::ArcSwap;
 use futures::prelude::*;
 use futures::task::AtomicTask;
 use futures::AsyncSink;
@@ -35,7 +34,7 @@ impl<T> Stream for AsyncBusReader<T> {
 
 pub struct AsyncBus<T> {
     bus: Bus<T>,
-    tasks: Vec<ArcSwap<AtomicTask>>,
+    tasks: Vec<Arc<AtomicTask>>,
     sink_closed: Arc<AtomicBool>,
 }
 
@@ -49,7 +48,7 @@ impl<T> AsyncBus<T> {
     }
     pub fn add_sub(&mut self) -> AsyncBusReader<T> {
         let arc = Arc::new(AtomicTask::new());
-        self.tasks.push(ArcSwap::from(arc.clone()));
+        self.tasks.push( arc.clone());
         AsyncBusReader {
             reader: self.bus.add_sub(),
             task: arc.clone(),
@@ -59,7 +58,7 @@ impl<T> AsyncBus<T> {
     pub fn push(&mut self,object:T){
         self.bus.push(object);
         for t in &self.tasks{
-            t.load().notify();
+            t.notify();
         }
     }
 }
@@ -74,7 +73,7 @@ impl<T> Sink for AsyncBus<T> {
     }
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         for t in &self.tasks{
-            t.load().notify();
+            t.notify();
         }
         Ok(Ready(()))
     }
