@@ -1,13 +1,73 @@
-use super::{Bus, BusReader, Ordering::Relaxed};
+use super::sync;
 use futures::prelude::*;
 use futures::{task::AtomicTask, Async, AsyncSink};
-use std::sync::{atomic::AtomicBool, mpsc, mpsc::Receiver, mpsc::Sender, Arc};
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::{mpsc, mpsc::Receiver, mpsc::Sender, Arc};
+
+pub struct AsyncBus<T> {
+    bus: sync::Bus<T>,
+    tasks: Vec<Arc<AtomicTask>>,
+    sink_closed: Arc<AtomicBool>,
+    task_receiver: Receiver<Arc<AtomicTask>>,
+}
 
 pub struct AsyncBusReader<T> {
-    reader: BusReader<T>,
+    reader: sync::BusReader<T>,
     task: Arc<AtomicTask>,
     sink_closed: Arc<AtomicBool>,
     task_sender: Sender<Arc<AtomicTask>>,
+}
+
+pub fn channel<T: Send>(size: usize) -> (AsyncBus<T>, AsyncBusReader<T>) {
+    let (sync_bus, sync_bus_reader) = sync::channel(size);
+    let (sender, receiver) = mpsc::channel();
+    let closed = Arc::new(AtomicBool::new(false));
+    let arc = Arc::new(AtomicTask::new());
+    sender.send(arc.clone()).unwrap();
+    (
+        AsyncBus {
+            bus: sync_bus,
+            tasks: Vec::new(),
+            task_receiver: receiver,
+            sink_closed: closed.clone(),
+        },
+        AsyncBusReader {
+            reader: sync_bus_reader,
+            task: arc,
+            sink_closed: closed.clone(),
+            task_sender: sender,
+        },
+    )
+}
+
+impl<T> Sink for AsyncBus<T> {
+    type SinkItem = T;
+    type SinkError = ();
+
+    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+        for task in self.task_receiver.try_recv().into_iter() {
+            self.tasks.push(task);
+        }
+        self.bus.broadcast(item);
+        Ok(AsyncSink::Ready)
+    }
+    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+        for t in &self.tasks {
+            t.notify();
+        }
+        Ok(Async::Ready(()))
+    }
+    fn close(&mut self) -> Poll<(), Self::SinkError> {
+        self.sink_closed.store(true, Relaxed);
+        Ok(Async::Ready(()))
+    }
+}
+
+impl<T> Drop for AsyncBus<T> {
+    fn drop(&mut self) {
+        self.close().unwrap();
+        self.poll_complete().unwrap();
+    }
 }
 
 impl<T> Stream for AsyncBusReader<T> {
@@ -40,69 +100,4 @@ impl<T> Clone for AsyncBusReader<T> {
             sink_closed: self.sink_closed.clone(),
         }
     }
-}
-
-pub struct AsyncBus<T> {
-    bus: Bus<T>,
-    tasks: Vec<Arc<AtomicTask>>,
-    sink_closed: Arc<AtomicBool>,
-    task_receiver: Receiver<Arc<AtomicTask>>,
-}
-
-impl<T> AsyncBus<T> {
-    fn new(size: usize, receiver: Receiver<Arc<AtomicTask>>) -> Self {
-        Self {
-            bus: Bus::new(size),
-            tasks: Vec::new(),
-            sink_closed: Arc::new(AtomicBool::new(false)),
-            task_receiver: receiver,
-        }
-    }
-    fn add_sub(&mut self, sender: Sender<Arc<AtomicTask>>) -> AsyncBusReader<T> {
-        let arc = Arc::new(AtomicTask::new());
-        self.tasks.push(arc.clone());
-        AsyncBusReader {
-            reader: self.bus.add_sub(),
-            task: arc.clone(),
-            sink_closed: self.sink_closed.clone(),
-            task_sender: sender,
-        }
-    }
-}
-
-impl<T> Sink for AsyncBus<T> {
-    type SinkItem = T;
-    type SinkError = ();
-
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        for task in self.task_receiver.try_recv().into_iter() {
-            self.tasks.push(task);
-        }
-        self.bus.push(item);
-        Ok(AsyncSink::Ready)
-    }
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        for t in &self.tasks {
-            t.notify();
-        }
-        Ok(Async::Ready(()))
-    }
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        self.sink_closed.store(true, Relaxed);
-        Ok(Async::Ready(()))
-    }
-}
-
-impl<T> Drop for AsyncBus<T> {
-    fn drop(&mut self) {
-        self.close().unwrap();
-        self.poll_complete().unwrap();
-    }
-}
-
-pub fn channel<T: Send>(size: usize) -> (AsyncBus<T>, AsyncBusReader<T>) {
-    let (tx, rx) = mpsc::channel();
-    let mut bus = AsyncBus::new(size, rx);
-    let bus_reader = bus.add_sub(tx);
-    (bus, bus_reader)
 }

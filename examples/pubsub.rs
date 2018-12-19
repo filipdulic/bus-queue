@@ -1,11 +1,11 @@
 extern crate bus_queue;
 
-use bus_queue::channel;
+use bus_queue::sync;
 use std::thread;
 use std::time;
 
 fn main() {
-    let(mut bus,mut rx1) = bus_queue::channel(10);
+    let (mut bus, mut rx1) = sync::channel(10);
     let mut rx2 = rx1.clone();
     let a = thread::spawn(move || {
         let mut vec = Vec::new();
@@ -14,7 +14,7 @@ fn main() {
         }
         thread::sleep(time::Duration::from_millis(2000));
         for i in vec {
-            bus.push(i);
+            bus.broadcast(i);
             thread::sleep(time::Duration::from_millis(500));
         }
     });
