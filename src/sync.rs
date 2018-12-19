@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 
 /// Provides an interface for the publisher
-pub struct Bus<T> {
+pub struct Publisher<T> {
     // atp to an array of atps of option<arc<t>>
     buffer: Arc<Vec<ArcSwapOption<T>>>,
     wi: Arc<AtomicUsize>,
@@ -16,32 +16,32 @@ pub struct Bus<T> {
 /// Every BusReader that can keep up with the push frequency should recv every pushed object.
 /// BusReaders unable to keep up will miss object once the writer's index wi is larger then
 /// reader's index ri + size
-pub struct BusReader<T> {
+pub struct Subscriber<T> {
     buffer: Arc<Vec<ArcSwapOption<T>>>,
     wi: Arc<AtomicUsize>,
     ri: usize,
     size: usize,
 }
 
-pub fn channel<T: Send>(size: usize) -> (Bus<T>, BusReader<T>) {
+pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
     let mut buffer = Vec::new();
     buffer.resize(size,ArcSwapOption::new(None));
     let buffer = Arc::new(buffer);
 
     let wi = Arc::new(AtomicUsize::new(0));
-    (Bus{
+    (Publisher {
         buffer: buffer.clone(),
-        size: size,
+        size,
         wi: wi.clone(),
-    },BusReader{
+    }, Subscriber {
         buffer: buffer.clone(),
-        size: size,
+        size,
         wi: wi.clone(),
         ri: 0,
     })
 }
 
-impl<T> Bus<T> {
+impl<T> Publisher<T> {
     /// Publishes values to the circular buffer at wi % size
     /// # Arguments
     /// * `object` - owned object to be published
@@ -51,7 +51,7 @@ impl<T> Bus<T> {
     }
 }
 
-impl<T> BusReader<T> {
+impl<T> Subscriber<T> {
     /// Receives some atomic refrence to an object if queue is not empty, or None if it is
     pub fn recv(&mut self) -> Option<Arc<T>> {
         if self.ri == self.wi.load(Ordering::Relaxed) {
@@ -71,7 +71,7 @@ impl<T> BusReader<T> {
     }
 }
 
-impl<T> Clone for BusReader<T> {
+impl<T> Clone for Subscriber<T> {
     fn clone(&self) -> Self {
         Self {
             buffer: self.buffer.clone(),

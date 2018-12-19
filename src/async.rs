@@ -4,43 +4,43 @@ use futures::{task::AtomicTask, Async, AsyncSink};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::{mpsc, mpsc::Receiver, mpsc::Sender, Arc};
 
-pub struct AsyncBus<T> {
-    bus: sync::Bus<T>,
+pub struct Publisher<T> {
+    publisher: sync::Publisher<T>,
     tasks: Vec<Arc<AtomicTask>>,
     sink_closed: Arc<AtomicBool>,
     task_receiver: Receiver<Arc<AtomicTask>>,
 }
 
-pub struct AsyncBusReader<T> {
-    reader: sync::BusReader<T>,
+pub struct Subscriber<T> {
+    subscriber: sync::Subscriber<T>,
     task: Arc<AtomicTask>,
     sink_closed: Arc<AtomicBool>,
     task_sender: Sender<Arc<AtomicTask>>,
 }
 
-pub fn channel<T: Send>(size: usize) -> (AsyncBus<T>, AsyncBusReader<T>) {
-    let (sync_bus, sync_bus_reader) = sync::channel(size);
-    let (sender, receiver) = mpsc::channel();
+pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
+    let (publisher, subscriber) = sync::channel(size);
+    let (task_sender, task_receiver) = mpsc::channel();
     let closed = Arc::new(AtomicBool::new(false));
     let arc = Arc::new(AtomicTask::new());
-    sender.send(arc.clone()).unwrap();
+    task_sender.send(arc.clone()).unwrap();
     (
-        AsyncBus {
-            bus: sync_bus,
+        Publisher {
+            publisher,
             tasks: Vec::new(),
-            task_receiver: receiver,
+            task_receiver,
             sink_closed: closed.clone(),
         },
-        AsyncBusReader {
-            reader: sync_bus_reader,
+        Subscriber {
+            subscriber,
             task: arc,
             sink_closed: closed.clone(),
-            task_sender: sender,
+            task_sender,
         },
     )
 }
 
-impl<T> Sink for AsyncBus<T> {
+impl<T> Sink for Publisher<T> {
     type SinkItem = T;
     type SinkError = ();
 
@@ -48,7 +48,7 @@ impl<T> Sink for AsyncBus<T> {
         for task in self.task_receiver.try_recv().into_iter() {
             self.tasks.push(task);
         }
-        self.bus.broadcast(item);
+        self.publisher.broadcast(item);
         Ok(AsyncSink::Ready)
     }
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
@@ -63,18 +63,18 @@ impl<T> Sink for AsyncBus<T> {
     }
 }
 
-impl<T> Drop for AsyncBus<T> {
+impl<T> Drop for Publisher<T> {
     fn drop(&mut self) {
         self.close().unwrap();
         self.poll_complete().unwrap();
     }
 }
 
-impl<T> Stream for AsyncBusReader<T> {
+impl<T> Stream for Subscriber<T> {
     type Item = Arc<T>;
     type Error = ();
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match self.reader.recv() {
+        match self.subscriber.recv() {
             Some(arc_object) => Ok(Async::Ready(Some(arc_object))),
             None => {
                 if self.sink_closed.load(Relaxed) == true {
@@ -89,12 +89,12 @@ impl<T> Stream for AsyncBusReader<T> {
     }
 }
 
-impl<T> Clone for AsyncBusReader<T> {
+impl<T> Clone for Subscriber<T> {
     fn clone(&self) -> Self {
         let arc = Arc::new(AtomicTask::new());
         self.task_sender.send(arc.clone()).unwrap();
         Self {
-            reader: self.reader.clone(),
+            subscriber: self.subscriber.clone(),
             task: arc.clone(),
             task_sender: self.task_sender.clone(),
             sink_closed: self.sink_closed.clone(),
