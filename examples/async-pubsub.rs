@@ -1,12 +1,12 @@
 extern crate bus_queue;
 extern crate futures;
-extern crate tokio;
+extern crate tokio_core;
 
 use bus_queue::async::AsyncBus;
+use futures::prelude::*;
 use std::thread;
 use std::time;
-use tokio::prelude::*;
-
+use tokio_core::reactor::Core;
 fn main() {
     let mut async_bus: AsyncBus<u32> = AsyncBus::new(10);
 
@@ -25,7 +25,7 @@ fn main() {
                 file.flush().unwrap();
                 futures::future::ok(())
             });
-            tokio::run(future);
+            Core::new().unwrap().run(future).unwrap();
         }));
     }
     let a = thread::spawn(move || {
@@ -34,12 +34,9 @@ fn main() {
             thread::sleep(time::Duration::from_millis(100));
             async_bus.push(i);
         }
-        async_bus.close().unwrap();
     });
     a.join().unwrap();
-    println!("1");
     for t in vec {
-        println!("2");
         t.join().unwrap();
     }
 }

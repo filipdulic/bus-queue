@@ -21,7 +21,6 @@ impl<T> Stream for AsyncBusReader<T> {
             None => {
                 if self.sink_closed.load(Relaxed) == true {
                     // Stream closed no further data will be available ever
-                    println!("Ready None sent");
                     Ok(Ready(None))
                 } else {
                     self.task.register();
@@ -48,16 +47,16 @@ impl<T> AsyncBus<T> {
     }
     pub fn add_sub(&mut self) -> AsyncBusReader<T> {
         let arc = Arc::new(AtomicTask::new());
-        self.tasks.push( arc.clone());
+        self.tasks.push(arc.clone());
         AsyncBusReader {
             reader: self.bus.add_sub(),
             task: arc.clone(),
             sink_closed: self.sink_closed.clone(),
         }
     }
-    pub fn push(&mut self,object:T){
+    pub fn push(&mut self, object: T) {
         self.bus.push(object);
-        for t in &self.tasks{
+        for t in &self.tasks {
             t.notify();
         }
     }
@@ -72,7 +71,7 @@ impl<T> Sink for AsyncBus<T> {
         Ok(AsyncSink::Ready)
     }
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        for t in &self.tasks{
+        for t in &self.tasks {
             t.notify();
         }
         Ok(Ready(()))
@@ -83,3 +82,9 @@ impl<T> Sink for AsyncBus<T> {
     }
 }
 
+impl<T> Drop for AsyncBus<T> {
+    fn drop(&mut self) {
+        self.close().unwrap();
+        self.poll_complete().unwrap();
+    }
+}

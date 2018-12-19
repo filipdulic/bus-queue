@@ -1,21 +1,21 @@
 [package]
 name = "bus_queue"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Filip Dulic <filip.dulic@gmail.com>"]
 description = "Lock free bounded non blocking pub sub queue"
 license = "Apache-2.0/MIT"
-keywords = ["pubsub", "lock-free", "queue"]
+keywords = ["pubsub", "lock-free", "queue","async","futures"]
 repository = "https://github.com/filipdulic/bus-queue"
 
 [dependencies]
 arc-swap = "0.3.6"
 futures = {version = "0.1", optional = true}
-tokio = {version = "0.1", optional = true}
+tokio-core = {version = "0.1", optional = true}
 
 [features]
 default = ["async"]
 async = ["futures"]
-async-example = ["tokio"]
+async-example = ["tokio-core"]
 
 [[example]]
 name = "pubsub"
