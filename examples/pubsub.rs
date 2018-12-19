@@ -5,7 +5,7 @@ use std::thread;
 use std::time;
 
 fn main() {
-    let bus: Bus<u32> = Bus::new(10);
+    let mut bus: Bus<u32> = Bus::new(10);
     let mut rx1 = bus.add_sub();
     let mut rx2 = bus.add_sub();
     let a = thread::spawn(move || {

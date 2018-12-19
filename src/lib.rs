@@ -62,7 +62,7 @@ impl<T> Bus<T> {
         }
     }
     /// Instantiates the BusReader struct connected the Bus circular buffer
-    pub fn add_sub(&self) -> BusReader<T> {
+    pub fn add_sub(&mut self) -> BusReader<T> {
         BusReader {
             buffer: self.buffer.clone(),
             wi: self.wi.clone(),
@@ -73,66 +73,11 @@ impl<T> Bus<T> {
     /// Publishes values to the circular buffer at wi % size
     /// # Arguments
     /// * `object` - owned object to be published
-    pub fn push(&self, object: T) {
+    pub fn push(&mut self, object: T) {
         self.buffer[self.wi.load(Ordering::Relaxed) % self.size].store(Some(Arc::new(object)));
         self.wi.fetch_add(1, Ordering::Relaxed);
     }
 }
 
 #[cfg(feature = "async")]
-pub mod async {
-    use super::Arc;
-    use super::{Bus, BusReader};
-    use futures::prelude::*;
-    use futures::task::{current, Task};
-    use futures::{Async::NotReady, Async::Ready};
-    use std::sync::mpsc::{channel, Receiver, Sender};
-
-    pub struct AsyncBusReader<T> {
-        reader: BusReader<T>,
-        task_sender: Sender<Task>,
-    }
-
-    impl<T> Stream for AsyncBusReader<T> {
-        type Item = Arc<T>;
-        type Error = ();
-        fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-            match self.reader.recv() {
-                Some(arc_object) => Ok(Ready(Some(arc_object))),
-                None => {
-                    self.task_sender.send(current()).unwrap();
-                    Ok(NotReady)
-                }
-            }
-        }
-    }
-
-    pub struct AsyncBus<T> {
-        bus: Bus<T>,
-        task_sender: Sender<Task>,
-        task_receiver: Receiver<Task>,
-    }
-
-    impl<T> AsyncBus<T> {
-        pub fn new(size: usize) -> Self {
-            let (tx, rx) = channel();
-            Self {
-                bus: Bus::new(size),
-                task_receiver: rx,
-                task_sender: tx,
-            }
-        }
-        pub fn add_sub(&mut self) -> AsyncBusReader<T> {
-            AsyncBusReader {
-                reader: self.bus.add_sub(),
-                task_sender: self.task_sender.clone(),
-            }
-        }
-        pub fn push(&mut self, object: T) {
-            self.bus.push(object);
-            for task in self.task_receiver.try_recv() {
-                task.notify();
-            }
-        }
-    }
-}
+pub mod async;

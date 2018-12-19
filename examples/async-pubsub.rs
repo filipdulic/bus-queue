@@ -30,14 +30,16 @@ fn main() {
     }
     let a = thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(2000));
-        for i in 0..100 {
+        for i in 0..50 {
+            thread::sleep(time::Duration::from_millis(100));
             async_bus.push(i);
-            thread::sleep(time::Duration::from_millis(200));
         }
-        thread::sleep(time::Duration::from_millis(5000));
-        async_bus.push(100);
-        thread::sleep(time::Duration::from_millis(5000));
+        async_bus.close().unwrap();
     });
-
     a.join().unwrap();
+    println!("1");
+    for t in vec {
+        println!("2");
+        t.join().unwrap();
+    }
 }
