@@ -4,14 +4,14 @@ use futures::{task::AtomicTask, Async, AsyncSink};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::{mpsc, mpsc::Receiver, mpsc::Sender, Arc};
 
-pub struct Publisher<T> {
+pub struct Publisher<T: Send> {
     publisher: sync::Publisher<T>,
     tasks: Vec<Arc<AtomicTask>>,
     sink_closed: Arc<AtomicBool>,
     task_receiver: Receiver<Arc<AtomicTask>>,
 }
 
-pub struct Subscriber<T> {
+pub struct Subscriber<T: Send> {
     subscriber: sync::Subscriber<T>,
     task: Arc<AtomicTask>,
     sink_closed: Arc<AtomicBool>,
@@ -40,7 +40,7 @@ pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
     )
 }
 
-impl<T> Sink for Publisher<T> {
+impl<T: Send> Sink for Publisher<T> {
     type SinkItem = T;
     type SinkError = ();
 
@@ -63,14 +63,14 @@ impl<T> Sink for Publisher<T> {
     }
 }
 
-impl<T> Drop for Publisher<T> {
+impl<T: Send> Drop for Publisher<T> {
     fn drop(&mut self) {
         self.close().unwrap();
         self.poll_complete().unwrap();
     }
 }
 
-impl<T> Stream for Subscriber<T> {
+impl<T: Send> Stream for Subscriber<T> {
     type Item = Arc<T>;
     type Error = ();
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -89,7 +89,7 @@ impl<T> Stream for Subscriber<T> {
     }
 }
 
-impl<T> Clone for Subscriber<T> {
+impl<T: Send> Clone for Subscriber<T> {
     fn clone(&self) -> Self {
         let arc = Arc::new(AtomicTask::new());
         self.task_sender.send(arc.clone()).unwrap();
