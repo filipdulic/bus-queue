@@ -62,7 +62,7 @@ impl<T> Bus<T> {
     /// Instantiates the Bus struct, creating the initial buffer filled with None.
     /// # Arguments
     /// * `size` - a usize size of the internal circular buffer
-    pub fn new(size: usize) -> Self {
+    fn new(size: usize) -> Self {
         let mut temp: Vec<ArcSwapOption<T>> = Vec::new();
         temp.resize(size, ArcSwapOption::new(None));
 
@@ -73,7 +73,7 @@ impl<T> Bus<T> {
         }
     }
     /// Instantiates the BusReader struct connected the Bus circular buffer
-    pub fn add_sub(&mut self) -> BusReader<T> {
+    fn add_sub(&mut self) -> BusReader<T> {
         BusReader {
             buffer: self.buffer.clone(),
             wi: self.wi.clone(),
@@ -88,6 +88,11 @@ impl<T> Bus<T> {
         self.buffer[self.wi.load(Ordering::Relaxed) % self.size].store(Some(Arc::new(object)));
         self.wi.fetch_add(1, Ordering::Relaxed);
     }
+}
+pub fn channel<T: Send>(size: usize) -> (Bus<T>, BusReader<T>) {
+    let mut bus = Bus::new(size);
+    let bus_reader = bus.add_sub();
+    (bus, bus_reader)
 }
 
 #[cfg(feature = "async")]

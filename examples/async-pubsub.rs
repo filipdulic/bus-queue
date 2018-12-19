@@ -2,18 +2,17 @@ extern crate bus_queue;
 extern crate futures;
 extern crate tokio_core;
 
-use bus_queue::async::AsyncBus;
 use futures::prelude::*;
 use std::thread;
 use std::time;
 use tokio_core::reactor::Core;
 fn main() {
-    let mut async_bus: AsyncBus<u32> = AsyncBus::new(10);
-
+    let (mut async_bus, rx) = bus_queue::async::channel(10);
     let mut streams = Vec::new();
-    for _i in 0..10 {
-        streams.push(async_bus.add_sub());
+    for _i in 0..9 {
+        streams.push(rx.clone());
     }
+    streams.push(rx);
     let mut vec = Vec::new();
     for (index, stream) in streams.into_iter().enumerate() {
         use std::fs::File;
