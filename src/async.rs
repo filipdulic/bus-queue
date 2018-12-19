@@ -1,15 +1,15 @@
 use super::{Arc, Ordering::Relaxed};
 use super::{Bus, BusReader};
+use super::arc_swap::ArcSwap;
 use futures::prelude::*;
-use futures::task::{current, Task};
+use futures::task::AtomicTask;
 use futures::AsyncSink;
 use futures::{Async::NotReady, Async::Ready};
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct AsyncBusReader<T> {
     reader: BusReader<T>,
-    task_sender: Sender<Task>,
+    task: Arc<AtomicTask>,
     sink_closed: Arc<AtomicBool>,
 }
 
@@ -25,7 +25,7 @@ impl<T> Stream for AsyncBusReader<T> {
                     println!("Ready None sent");
                     Ok(Ready(None))
                 } else {
-                    self.task_sender.send(current()).unwrap();
+                    self.task.register();
                     Ok(NotReady)
                 }
             }
@@ -33,38 +33,33 @@ impl<T> Stream for AsyncBusReader<T> {
     }
 }
 
-//impl<T> Drop for AsyncBusReader<T>{
-//    fn drop(&mut self){}
-//}
-
 pub struct AsyncBus<T> {
     bus: Bus<T>,
-    task_sender: Sender<Task>,
-    task_receiver: Receiver<Task>,
+    tasks: Vec<ArcSwap<AtomicTask>>,
     sink_closed: Arc<AtomicBool>,
 }
 
 impl<T> AsyncBus<T> {
     pub fn new(size: usize) -> Self {
-        let (tx, rx) = channel();
         Self {
             bus: Bus::new(size),
-            task_receiver: rx,
-            task_sender: tx,
+            tasks: Vec::new(),
             sink_closed: Arc::new(AtomicBool::new(false)),
         }
     }
     pub fn add_sub(&mut self) -> AsyncBusReader<T> {
+        let arc = Arc::new(AtomicTask::new());
+        self.tasks.push(ArcSwap::from(arc.clone()));
         AsyncBusReader {
             reader: self.bus.add_sub(),
-            task_sender: self.task_sender.clone(),
+            task: arc.clone(),
             sink_closed: self.sink_closed.clone(),
         }
     }
     pub fn push(&mut self,object:T){
         self.bus.push(object);
-        for t in self.task_receiver.try_recv() {
-            t.notify();
+        for t in &self.tasks{
+            t.load().notify();
         }
     }
 }
@@ -78,8 +73,8 @@ impl<T> Sink for AsyncBus<T> {
         Ok(AsyncSink::Ready)
     }
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        for task in self.task_receiver.try_recv() {
-            task.notify();
+        for t in &self.tasks{
+            t.load().notify();
         }
         Ok(Ready(()))
     }
@@ -89,8 +84,3 @@ impl<T> Sink for AsyncBus<T> {
     }
 }
 
-//impl<T> Drop for AsyncBus<T>{
-//    fn drop(&mut self){
-//        self.poll_complete().unwrap();
-//    }
-//}
