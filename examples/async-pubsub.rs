@@ -30,9 +30,10 @@ fn main() {
     }
     let a = thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(2000));
+        let async_bus = &mut async_bus;
         for i in 0..50 {
             thread::sleep(time::Duration::from_millis(100));
-            async_bus.push(i);
+            async_bus.send(i).wait().unwrap();
         }
     });
     a.join().unwrap();

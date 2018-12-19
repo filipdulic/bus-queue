@@ -54,12 +54,6 @@ impl<T> AsyncBus<T> {
             sink_closed: self.sink_closed.clone(),
         }
     }
-    pub fn push(&mut self, object: T) {
-        self.bus.push(object);
-        for t in &self.tasks {
-            t.notify();
-        }
-    }
 }
 
 impl<T> Sink for AsyncBus<T> {
