@@ -39,6 +39,17 @@ impl<T> BusReader<T> {
     }
 }
 
+impl<T> Clone for BusReader<T> {
+    fn clone(&self) -> Self {
+        Self {
+            buffer: self.buffer.clone(),
+            wi: self.wi.clone(),
+            ri: self.ri,
+            size: self.size,
+        }
+    }
+}
+
 /// Provides an interface for the publisher
 pub struct Bus<T> {
     // atp to an array of atps of option<arc<t>>
