@@ -1,11 +1,11 @@
 use super::*;
 use arc_swap::ArcSwapOption;
+#[allow(unused_imports)]
+use std::iter::{IntoIterator, Iterator};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
-#[allow(unused_imports)]
-use std::iter::{Iterator,IntoIterator};
 
 /// Provides an interface for the publisher
 pub struct Publisher<T: Send> {
@@ -114,9 +114,9 @@ impl<T: Send> Subscriber<T> {
         }
     }
 
-//    pub fn recv(&mut self) -> Result<Arc<T>, RecvError> {}
-//    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {}
-//    pub fn recv_deadline(&self, deadline: Instant) -> Result<T, RecvTimeoutError> {}
+    //    pub fn recv(&mut self) -> Result<Arc<T>, RecvError> {}
+    //    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {}
+    //    pub fn recv_deadline(&self, deadline: Instant) -> Result<T, RecvTimeoutError> {}
 }
 
 impl<T: Send> Clone for Subscriber<T> {

@@ -9,12 +9,11 @@ fn main() {
     let (mut bus, rx1) = sync::channel(3);
     let rx2 = rx1.clone();
     let publisher = thread::spawn(move || {
-
         thread::sleep(time::Duration::from_millis(2000));
         for i in 0..15 {
             match bus.broadcast(i.clone()) {
-                Ok(_)=> println!("publisher\t-->\t{}",i.clone()),
-                Err(e)=> println!("publisher error: {:?}",e)
+                Ok(_) => println!("publisher\t-->\t{}", i.clone()),
+                Err(e) => println!("publisher error: {:?}", e),
             }
             thread::sleep(time::Duration::from_millis(500));
         }
@@ -25,7 +24,7 @@ fn main() {
         loop {
             match rx1.try_recv() {
                 Err(e) => match e {
-                    TryRecvError::Empty => (),//println!("b: Buffer empty"),
+                    TryRecvError::Empty => (), //println!("b: Buffer empty"),
                     TryRecvError::Disconnected => {
                         println!("subscriber_1: Pub Disconnected!");
                         return ();
@@ -42,7 +41,7 @@ fn main() {
         loop {
             match rx2.try_recv() {
                 Err(e) => match e {
-                    TryRecvError::Empty => (),//println!("c: Buffer empty"),
+                    TryRecvError::Empty => (), //println!("c: Buffer empty"),
                     TryRecvError::Disconnected => {
                         println!("subscriber_2: Pub Disconnected!");
                         return ();
