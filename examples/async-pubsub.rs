@@ -22,6 +22,7 @@ fn main() {
             let future = stream.for_each(move |curr| {
                 writeln!(file, "{}\r", curr);
                 file.flush().unwrap();
+                thread::sleep(time::Duration::from_millis(200));
                 futures::future::ok(())
             });
             Core::new().unwrap().run(future).unwrap();

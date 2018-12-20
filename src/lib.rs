@@ -115,13 +115,13 @@ impl<T: Send> Drop for BareSubscriber<T> {
 }
 
 pub struct Waker<T> {
-    pub sleepers: Vec<Arc<ArcSwap<T>>>,
-    receiver: mpsc::Receiver<Arc<ArcSwap<T>>>,
+    pub sleepers: Vec<Arc<T>>,
+    receiver: mpsc::Receiver<Arc<T>>,
 }
 
 pub struct Sleeper<T> {
-    pub sleeper: Arc<ArcSwap<T>>,
-    pub sender: mpsc::Sender<Arc<ArcSwap<T>>>,
+    pub sleeper: Arc<T>,
+    pub sender: mpsc::Sender<Arc<T>>,
 }
 
 impl<T> Waker<T> {
@@ -132,19 +132,10 @@ impl<T> Waker<T> {
     }
 }
 
-impl<T> Sleeper<T> {
-    pub fn send(&self, current: Arc<ArcSwap<T>>) {
-        self.sender.send(current).unwrap();
-    }
-    pub fn register(&self, t: T) {
-        self.sleeper.store(Arc::new(t));
-    }
-}
-
 fn alarm<T>(current: T) -> (Waker<T>, Sleeper<T>) {
     let mut vec = Vec::new();
     let (sender, receiver) = mpsc::channel();
-    let arc_t = Arc::new(ArcSwap::new(Arc::new(current)));
+    let arc_t = Arc::new(current);
     vec.push(arc_t.clone());
     (
         Waker {

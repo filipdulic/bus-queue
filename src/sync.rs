@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 /// Provides an interface for the publisher
 pub struct Publisher<T: Send> {
     bare_publisher: BarePublisher<T>,
-    waker: Waker<thread::Thread>,
+    waker: Waker<ArcSwap<thread::Thread>>,
 }
 
 /// Provides an interface for subscribers
@@ -16,12 +16,12 @@ pub struct Publisher<T: Send> {
 /// reader's index ri + size
 pub struct Subscriber<T: Send> {
     bare_subscriber: BareSubscriber<T>,
-    sleeper: Sleeper<thread::Thread>,
+    sleeper: Sleeper<ArcSwap<thread::Thread>>,
 }
 
 pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
     let (bare_publisher, bare_subscriber) = bare_channel(size);
-    let (waker, sleeper) = alarm(thread::current());
+    let (waker, sleeper) = alarm(ArcSwap::new(Arc::new(thread::current())));
     (
         Publisher {
             bare_publisher,
@@ -72,7 +72,7 @@ impl<T: Send> Subscriber<T> {
                     return Err(RecvError);
                 }
             }
-            self.sleeper.register(thread::current());
+            self.sleeper.sleeper.store(Arc::new(thread::current()));
             thread::park();
         }
     }
@@ -87,7 +87,7 @@ impl<T: Send> Subscriber<T> {
                     return Err(RecvTimeoutError::Disconnected);
                 }
             }
-            self.sleeper.register(thread::current());
+            self.sleeper.sleeper.store(Arc::new(thread::current()));
             let parking = Instant::now();
             thread::park_timeout(timeout);
             let unparked = Instant::now();
@@ -102,7 +102,7 @@ impl<T: Send> Subscriber<T> {
 impl<T: Send> Clone for Subscriber<T> {
     fn clone(&self) -> Self {
         let arc_t = Arc::new(ArcSwap::new(Arc::new(thread::current())));
-        self.sleeper.send(arc_t.clone());
+        self.sleeper.sender.send(arc_t.clone()).unwrap();
         Self {
             bare_subscriber: self.bare_subscriber.clone(),
             sleeper: Sleeper {

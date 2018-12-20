@@ -29,7 +29,7 @@ pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
 impl<T: Send> Publisher<T> {
     fn wake_all(&self) {
         for sleeper in &self.waker.sleepers {
-            sleeper.load().notify();
+            sleeper.notify();
         }
     }
 }
@@ -69,7 +69,7 @@ impl<T: Send> Stream for Subscriber<T> {
             Ok(arc_object) => Ok(Async::Ready(Some(arc_object))),
             Err(error) => match error {
                 TryRecvError::Empty => {
-                    self.sleeper.sleeper.load().register();
+                    self.sleeper.sleeper.register();
                     Ok(Async::NotReady)
                 }
                 TryRecvError::Disconnected => Ok(Async::Ready(None)),
@@ -80,8 +80,8 @@ impl<T: Send> Stream for Subscriber<T> {
 
 impl<T: Send> Clone for Subscriber<T> {
     fn clone(&self) -> Self {
-        let arc_t = Arc::new(ArcSwap::new(Arc::new(AtomicTask::new())));
-        self.sleeper.send(arc_t.clone());
+        let arc_t = Arc::new(AtomicTask::new());
+        self.sleeper.sender.send(arc_t.clone()).unwrap();
         Self {
             bare_subscriber: self.bare_subscriber.clone(),
             sleeper: Sleeper {
