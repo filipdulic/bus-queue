@@ -1,21 +1,12 @@
 use super::*;
-use arc_swap::ArcSwapOption;
-#[allow(unused_imports)]
 use std::iter::{IntoIterator, Iterator};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
-#[allow(unused_imports)]
+use std::thread;
 use std::time::{Duration, Instant};
 
 /// Provides an interface for the publisher
 pub struct Publisher<T: Send> {
-    // atp to an array of atps of option<arc<t>>
-    buffer: Arc<Vec<ArcSwapOption<T>>>,
-    wi: Arc<AtomicUsize>,
-    size: usize,
-    sub_cnt: Arc<AtomicUsize>,
-    pub_available: Arc<AtomicBool>,
-    cv: Arc<Condvar>,
+    bare_publisher: BarePublisher<T>,
+    waker: Waker<thread::Thread>,
 }
 
 /// Provides an interface for subscribers
@@ -23,45 +14,22 @@ pub struct Publisher<T: Send> {
 /// Every BusReader that can keep up with the push frequency should recv every pushed object.
 /// BusReaders unable to keep up will miss object once the writer's index wi is larger then
 /// reader's index ri + size
-#[derive(Debug)]
 pub struct Subscriber<T: Send> {
-    buffer: Arc<Vec<ArcSwapOption<T>>>,
-    wi: Arc<AtomicUsize>,
-    ri: AtomicUsize,
-    size: usize,
-    sub_cnt: Arc<AtomicUsize>,
-    pub_available: Arc<AtomicBool>,
-    cv: Arc<Condvar>,
-    mtx: Arc<Mutex<bool>>,
+    bare_subscriber: BareSubscriber<T>,
+    sleeper: Sleeper<thread::Thread>,
 }
 
 pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
-    let mut buffer = Vec::new();
-    buffer.resize(size, ArcSwapOption::new(None));
-    let buffer = Arc::new(buffer);
-    let sub_cnt = Arc::new(AtomicUsize::new(1));
-    let wi = Arc::new(AtomicUsize::new(0));
-    let pub_available = Arc::new(AtomicBool::new(true));
-    let cv = Arc::new(Condvar::new());
-    let mtx = Arc::new(Mutex::new(false));
+    let (bare_publisher, bare_subscriber) = bare_channel(size);
+    let (waker, sleeper) = alarm(thread::current());
     (
         Publisher {
-            buffer: buffer.clone(),
-            size,
-            wi: wi.clone(),
-            sub_cnt: sub_cnt.clone(),
-            pub_available: pub_available.clone(),
-            cv: cv.clone(),
+            bare_publisher,
+            waker,
         },
         Subscriber {
-            buffer: buffer.clone(),
-            size,
-            wi: wi.clone(),
-            ri: AtomicUsize::new(0),
-            sub_cnt: sub_cnt.clone(),
-            pub_available: pub_available.clone(),
-            cv: cv.clone(),
-            mtx: mtx.clone(),
+            bare_subscriber,
+            sleeper,
         },
     )
 }
@@ -71,73 +39,77 @@ impl<T: Send> Publisher<T> {
     /// # Arguments
     /// * `object` - owned object to be published
     pub fn broadcast(&mut self, object: T) -> Result<(), SendError<T>> {
-        if self.sub_cnt.load(Ordering::Relaxed) == 0 {
-            return Err(SendError(object));
-        }
-        self.buffer[self.wi.load(Ordering::Relaxed) % self.size].store(Some(Arc::new(object)));
-        self.wi.fetch_add(1, Ordering::Relaxed);
-        self.cv.notify_all();
+        self.bare_publisher.broadcast(object)?;
+        self.waker.register_receivers();
+        self.wake_all();
         Ok(())
+    }
+    pub fn wake_all(&self) {
+        for sleeper in &self.waker.sleepers {
+            sleeper.load().unpark();
+        }
     }
 }
 
 impl<T: Send> Drop for Publisher<T> {
     fn drop(&mut self) {
-        self.pub_available.store(false, Ordering::Relaxed);
+        self.wake_all();
     }
 }
 
 impl<T: Send> Subscriber<T> {
-    /// Receives some atomic refrence to an object if queue is not empty, or None if it is
     pub fn try_recv(&self) -> Result<Arc<T>, TryRecvError> {
-        if self.pub_available.load(Ordering::Relaxed) == false {
-            return Err(TryRecvError::Disconnected);
-        }
-        if self.ri.load(Ordering::Relaxed) == self.wi.load(Ordering::Relaxed) {
-            return Err(TryRecvError::Empty);
-        }
+        self.bare_subscriber.try_recv()
+    }
+    pub fn recv(&self) -> Result<Arc<T>, RecvError> {
         loop {
-            match self.buffer[self.ri.load(Ordering::Relaxed) % self.size].load() {
-                Some(some) => if self.wi.load(Ordering::Relaxed)
-                    > self.ri.load(Ordering::Relaxed) + self.size
-                {
-                    self.ri.store(
-                        self.wi.load(Ordering::Relaxed) - self.size,
-                        Ordering::Relaxed,
-                    );
-                } else {
-                    self.ri.fetch_add(1, Ordering::Relaxed);
-                    return Ok(some);
-                },
-                None => unreachable!(),
+            let result = self.bare_subscriber.try_recv();
+            if let Ok(object) = result {
+                return Ok(object);
+            }
+            if let Err(e) = result {
+                if let TryRecvError::Disconnected = e {
+                    return Err(RecvError);
+                }
+            }
+            self.sleeper.register(thread::current());
+            thread::park();
+        }
+    }
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<Arc<T>, RecvTimeoutError> {
+        loop {
+            let result = self.bare_subscriber.try_recv();
+            if let Ok(object) = result {
+                return Ok(object);
+            }
+            if let Err(e) = result {
+                if let TryRecvError::Disconnected = e {
+                    return Err(RecvTimeoutError::Disconnected);
+                }
+            }
+            self.sleeper.register(thread::current());
+            let parking = Instant::now();
+            thread::park_timeout(timeout);
+            let unparked = Instant::now();
+            if unparked.duration_since(parking) >= timeout {
+                return Err(RecvTimeoutError::Timeout);
             }
         }
     }
-
-    //    pub fn recv(&mut self) -> Result<Arc<T>, RecvError> {}
-    //    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {}
     //    pub fn recv_deadline(&self, deadline: Instant) -> Result<T, RecvTimeoutError> {}
 }
 
 impl<T: Send> Clone for Subscriber<T> {
     fn clone(&self) -> Self {
-        self.sub_cnt.fetch_add(1, Ordering::Relaxed);
+        let arc_t = Arc::new(ArcSwap::new(Arc::new(thread::current())));
+        self.sleeper.send(arc_t.clone());
         Self {
-            buffer: self.buffer.clone(),
-            wi: self.wi.clone(),
-            ri: AtomicUsize::new(self.ri.load(Ordering::Relaxed)),
-            size: self.size,
-            sub_cnt: self.sub_cnt.clone(),
-            pub_available: self.pub_available.clone(),
-            cv: self.cv.clone(),
-            mtx: self.mtx.clone(),
+            bare_subscriber: self.bare_subscriber.clone(),
+            sleeper: Sleeper {
+                sender: self.sleeper.sender.clone(),
+                sleeper: arc_t.clone(),
+            },
         }
-    }
-}
-
-impl<T: Send> Drop for Subscriber<T> {
-    fn drop(&mut self) {
-        self.sub_cnt.fetch_sub(1, Ordering::Relaxed);
     }
 }
 

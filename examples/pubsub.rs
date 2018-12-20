@@ -1,7 +1,7 @@
+#![allow(non_snake_case)]
 extern crate bus_queue;
 
 use bus_queue::sync;
-use std::sync::mpsc::TryRecvError;
 use std::thread;
 use std::time;
 
@@ -9,7 +9,7 @@ fn main() {
     let (mut bus, rx1) = sync::channel(3);
     let rx2 = rx1.clone();
     let publisher = thread::spawn(move || {
-        thread::sleep(time::Duration::from_millis(2000));
+        thread::sleep(time::Duration::from_millis(500));
         for i in 0..15 {
             match bus.broadcast(i.clone()) {
                 Ok(_) => println!("publisher\t-->\t{}", i.clone()),
@@ -22,11 +22,10 @@ fn main() {
     let subscriber_1 = thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(1000));
         loop {
-            match rx1.try_recv() {
+            match rx1.recv() {
                 Err(e) => match e {
-                    TryRecvError::Empty => (), //println!("b: Buffer empty"),
-                    TryRecvError::Disconnected => {
-                        println!("subscriber_1: Pub Disconnected!");
+                    RecvError => {
+                        println!("subscriber_1: {:?}", RecvError);
                         return ();
                     }
                 },
@@ -39,11 +38,10 @@ fn main() {
     let subscriber_2 = thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(1000));
         loop {
-            match rx2.try_recv() {
+            match rx2.recv() {
                 Err(e) => match e {
-                    TryRecvError::Empty => (), //println!("c: Buffer empty"),
-                    TryRecvError::Disconnected => {
-                        println!("subscriber_2: Pub Disconnected!");
+                    RecvError => {
+                        println!("subscriber_2: {:?}", RecvError);
                         return ();
                     }
                 },

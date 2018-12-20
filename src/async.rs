@@ -1,37 +1,37 @@
 use super::*;
 use futures::prelude::*;
 use futures::{task::AtomicTask, Async, AsyncSink};
-use std::sync::{mpsc, mpsc::Receiver, mpsc::Sender, Arc};
 
 pub struct Publisher<T: Send> {
-    publisher: sync::Publisher<T>,
-    tasks: Vec<Arc<AtomicTask>>,
-    task_receiver: Receiver<Arc<AtomicTask>>,
+    bare_publisher: BarePublisher<T>,
+    waker: Waker<AtomicTask>,
 }
 
 pub struct Subscriber<T: Send> {
-    subscriber: sync::Subscriber<T>,
-    task: Arc<AtomicTask>,
-    task_sender: Sender<Arc<AtomicTask>>,
+    bare_subscriber: BareSubscriber<T>,
+    sleeper: Sleeper<AtomicTask>,
 }
 
 pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
-    let (publisher, subscriber) = sync::channel(size);
-    let (task_sender, task_receiver) = mpsc::channel();
-    let arc = Arc::new(AtomicTask::new());
-    task_sender.send(arc.clone()).unwrap();
+    let (bare_publisher, bare_subscriber) = bare_channel(size);
+    let (waker, sleeper) = alarm(AtomicTask::new());
     (
         Publisher {
-            publisher,
-            tasks: Vec::new(),
-            task_receiver,
+            bare_publisher,
+            waker,
         },
         Subscriber {
-            subscriber,
-            task: arc,
-            task_sender,
+            bare_subscriber,
+            sleeper,
         },
     )
+}
+impl<T: Send> Publisher<T> {
+    fn wake_all(&self) {
+        for sleeper in &self.waker.sleepers {
+            sleeper.load().notify();
+        }
+    }
 }
 
 impl<T: Send> Sink for Publisher<T> {
@@ -39,18 +39,14 @@ impl<T: Send> Sink for Publisher<T> {
     type SinkError = SendError<T>;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        for task in self.task_receiver.try_recv().into_iter() {
-            self.tasks.push(task);
-        }
-        match self.publisher.broadcast(item) {
+        self.waker.register_receivers();
+        match self.bare_publisher.broadcast(item) {
             Ok(_) => Ok(AsyncSink::Ready),
             Err(e) => Err(e),
         }
     }
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        for t in &self.tasks {
-            t.notify();
-        }
+        self.wake_all();
         Ok(Async::Ready(()))
     }
     fn close(&mut self) -> Poll<(), Self::SinkError> {
@@ -69,11 +65,11 @@ impl<T: Send> Stream for Subscriber<T> {
     type Item = Arc<T>;
     type Error = ();
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match self.subscriber.try_recv() {
+        match self.bare_subscriber.try_recv() {
             Ok(arc_object) => Ok(Async::Ready(Some(arc_object))),
             Err(error) => match error {
                 TryRecvError::Empty => {
-                    self.task.register();
+                    self.sleeper.sleeper.load().register();
                     Ok(Async::NotReady)
                 }
                 TryRecvError::Disconnected => Ok(Async::Ready(None)),
@@ -84,12 +80,14 @@ impl<T: Send> Stream for Subscriber<T> {
 
 impl<T: Send> Clone for Subscriber<T> {
     fn clone(&self) -> Self {
-        let arc = Arc::new(AtomicTask::new());
-        self.task_sender.send(arc.clone()).unwrap();
+        let arc_t = Arc::new(ArcSwap::new(Arc::new(AtomicTask::new())));
+        self.sleeper.send(arc_t.clone());
         Self {
-            subscriber: self.subscriber.clone(),
-            task: arc.clone(),
-            task_sender: self.task_sender.clone(),
+            bare_subscriber: self.bare_subscriber.clone(),
+            sleeper: Sleeper {
+                sender: self.sleeper.sender.clone(),
+                sleeper: arc_t.clone(),
+            },
         }
     }
 }
