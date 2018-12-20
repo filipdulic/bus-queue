@@ -1,46 +1,59 @@
 extern crate bus_queue;
 
 use bus_queue::sync;
+use std::sync::mpsc::TryRecvError;
 use std::thread;
 use std::time;
 
 fn main() {
-    let (mut bus, mut rx1) = sync::channel(10);
-    let mut rx2 = rx1.clone();
-    let a = thread::spawn(move || {
-        let mut vec = Vec::new();
-        for i in 0..40 {
-            vec.push(i);
-        }
+    let (mut bus, rx1) = sync::channel(3);
+    let rx2 = rx1.clone();
+    let publisher = thread::spawn(move || {
+
         thread::sleep(time::Duration::from_millis(2000));
-        for i in vec {
-            bus.broadcast(i);
+        for i in 0..15 {
+            match bus.broadcast(i.clone()) {
+                Ok(_)=> println!("publisher\t-->\t{}",i.clone()),
+                Err(e)=> println!("publisher error: {:?}",e)
+            }
             thread::sleep(time::Duration::from_millis(500));
         }
     });
 
-    let b = thread::spawn(move || {
+    let subscriber_1 = thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(1000));
-        for _i in 0..100 {
-            match rx1.recv() {
-                None => println!("b: empty;"),
-                Some(ref arc_obj) => println!("b: {}", arc_obj),
+        loop {
+            match rx1.try_recv() {
+                Err(e) => match e {
+                    TryRecvError::Empty => (),//println!("b: Buffer empty"),
+                    TryRecvError::Disconnected => {
+                        println!("subscriber_1: Pub Disconnected!");
+                        return ();
+                    }
+                },
+                Ok(ref arc_obj) => println!("subscriber_1\t<--\t{}", arc_obj),
             }
             thread::sleep(time::Duration::from_millis(100));
         }
     });
 
-    let c = thread::spawn(move || {
+    let subscriber_2 = thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(1000));
-        for _i in 0..100 {
-            match rx2.recv() {
-                None => println!("c: empty"),
-                Some(ref arc_obj) => println!("c: {}", arc_obj),
+        loop {
+            match rx2.try_recv() {
+                Err(e) => match e {
+                    TryRecvError::Empty => (),//println!("c: Buffer empty"),
+                    TryRecvError::Disconnected => {
+                        println!("subscriber_2: Pub Disconnected!");
+                        return ();
+                    }
+                },
+                Ok(ref arc_obj) => println!("subscriber_2\t<--\t{}", arc_obj),
             }
             thread::sleep(time::Duration::from_millis(1000));
         }
     });
-    a.join().unwrap();
-    b.join().unwrap();
-    c.join().unwrap();
+    publisher.join().unwrap();
+    subscriber_1.join().unwrap();
+    subscriber_2.join().unwrap();
 }
