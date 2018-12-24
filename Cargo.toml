@@ -10,19 +10,22 @@ repository = "https://github.com/filipdulic/bus-queue"
 [dependencies]
 arc-swap = "0.3.6"
 futures = {version = "0.1", optional = true}
-tokio-core = {version = "0.1", optional = true}
+tokio = {version = "0.1", optional = true}
 
 [features]
 default = ["async"]
 async = ["futures"]
-async-example = ["tokio-core"]
+async-example = ["tokio"]
 
 [[example]]
-name = "pubsub"
-path = "examples/pubsub.rs"
+name = "bare-simple"
+path = "examples/bare-simple.rs"
 
 [[example]]
-name = "async-pubsub"
-path = "examples/async-pubsub.rs"
+name = "sync-simple"
+path = "examples/sync-simple.rs"
+
+[[example]]
+name = "async-simple"
+path = "examples/async-simple.rs"
 required-features = ["async-example"]
-

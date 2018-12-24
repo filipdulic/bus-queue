@@ -1,9 +1,10 @@
 use super::*;
-use std::iter::{IntoIterator, Iterator};
+use std::iter::{Iterator};
 use std::thread;
 use std::time::{Duration, Instant};
 
 /// Provides an interface for the publisher
+#[derive(Debug)]
 pub struct Publisher<T: Send> {
     bare_publisher: BarePublisher<T>,
     waker: Waker<ArcSwap<thread::Thread>>,
@@ -14,6 +15,7 @@ pub struct Publisher<T: Send> {
 /// Every BusReader that can keep up with the push frequency should recv every pushed object.
 /// BusReaders unable to keep up will miss object once the writer's index wi is larger then
 /// reader's index ri + size
+#[derive(Debug)]
 pub struct Subscriber<T: Send> {
     bare_subscriber: BareSubscriber<T>,
     sleeper: Sleeper<ArcSwap<thread::Thread>>,
@@ -96,7 +98,6 @@ impl<T: Send> Subscriber<T> {
             }
         }
     }
-    //    pub fn recv_deadline(&self, deadline: Instant) -> Result<T, RecvTimeoutError> {}
 }
 
 impl<T: Send> Clone for Subscriber<T> {
@@ -113,7 +114,22 @@ impl<T: Send> Clone for Subscriber<T> {
     }
 }
 
-//impl<'a, T> Iterator for &'a Subscriber<T> {}
-//impl<T> Iterator for Subscriber<T>{}
-//impl<'a, T> IntoIterator for &'a Subscriber<T> {}
-//impl<T> IntoIterator for Subscriber<T>{}
+impl<'a, T: Send> Iterator for &'a Subscriber<T> {
+    type Item = Arc<T>;
+
+    fn next(&mut self) -> Option<Self::Item>{
+        match self.recv() {
+            Ok(item) => Some(item),
+            Err(_) => None
+        }
+    }
+}
+impl<T: Send> Iterator for Subscriber<T> {
+    type Item = Arc<T>;
+    fn next(&mut self) -> Option<Self::Item>{
+        match self.recv() {
+            Ok(item) => Some(item),
+            Err(_) => None
+        }
+    }
+}

@@ -1,12 +1,12 @@
 use super::*;
 use futures::prelude::*;
 use futures::{task::AtomicTask, Async, AsyncSink};
-
+#[derive(Debug)]
 pub struct Publisher<T: Send> {
     bare_publisher: BarePublisher<T>,
     waker: Waker<AtomicTask>,
 }
-
+#[derive(Debug)]
 pub struct Subscriber<T: Send> {
     bare_subscriber: BareSubscriber<T>,
     sleeper: Sleeper<AtomicTask>,
