@@ -1,6 +1,6 @@
 [package]
 name = "bus_queue"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Filip Dulic <filip.dulic@gmail.com>"]
 description = "Lock-free Bounded non-Blocking Pub-Sub Queue"
 license = "Apache-2.0/MIT"
