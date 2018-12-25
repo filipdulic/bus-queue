@@ -47,10 +47,14 @@
 //! use bus_queue::bare_channel;
 //!
 //!fn main() {
-//!    let (mut tx,rx) = bare_channel(1);
+//!    let (mut tx, rx) = bare_channel(10);
+//!    (1..15).for_each(|x| tx.broadcast(x).unwrap());
 //!
-//!    tx.broadcast(4).unwrap();
-//!    assert_eq!(4,*rx.try_recv().unwrap());
+//!    let received: Vec<i32> = rx.into_iter().map(|x| *x).collect();
+//!    // Test that only the last 10 elements are in the received list.
+//!    let expected: Vec<i32> = (5..15).collect();
+//!
+//!    assert_eq!(expected, received);
 //!}
 //! ```
 //! ## Simple synchronous usage
@@ -200,17 +204,18 @@ impl<T: Send> BareSubscriber<T> {
         }
         loop {
             match self.buffer[self.ri.load(Ordering::Relaxed) % self.size].load() {
-                Some(some) => if self.wi.load(Ordering::Relaxed)
-                    > self.ri.load(Ordering::Relaxed) + self.size
-                {
-                    self.ri.store(
-                        self.wi.load(Ordering::Relaxed) - self.size,
-                        Ordering::Relaxed,
-                    );
-                } else {
-                    self.ri.fetch_add(1, Ordering::Relaxed);
-                    return Ok(some);
-                },
+                Some(some) => {
+                    if self.wi.load(Ordering::Relaxed) > self.ri.load(Ordering::Relaxed) + self.size
+                    {
+                        self.ri.store(
+                            self.wi.load(Ordering::Relaxed) - self.size,
+                            Ordering::Relaxed,
+                        );
+                    } else {
+                        self.ri.fetch_add(1, Ordering::Relaxed);
+                        return Ok(some);
+                    }
+                }
                 None => unreachable!(),
             }
         }
