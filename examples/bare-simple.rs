@@ -3,8 +3,12 @@ extern crate bus_queue;
 use bus_queue::bare_channel;
 
 fn main() {
-    let (mut tx,rx) = bare_channel(1);
+    let (mut tx, rx) = bare_channel(10);
+    vec![1, 2, 3, 4]
+        .into_iter()
+        .for_each(|x| tx.broadcast(x).unwrap());
 
-    tx.broadcast(4).unwrap();
-    assert_eq!(4,*rx.try_recv().unwrap());
+    let received: Vec<i32> = rx.into_iter().map(|x| *x).collect();
+
+    assert_eq!(vec![1, 2, 3, 4], received);
 }

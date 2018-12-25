@@ -117,9 +117,9 @@
 //! [`unwrap`]: ../../../std/result/enum.Result.html#method.unwrap
 extern crate arc_swap;
 use arc_swap::{ArcSwap, ArcSwapOption};
+use std::iter::Iterator;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 use std::sync::{atomic::AtomicBool, atomic::AtomicUsize, atomic::Ordering, mpsc, Arc};
-use std::iter::{Iterator};
 
 /// Bare implementation of the publisher.
 #[derive(Debug)]
@@ -242,10 +242,10 @@ impl<T: Send> Drop for BareSubscriber<T> {
 impl<T: Send> Iterator for BareSubscriber<T> {
     type Item = Arc<T>;
 
-    fn next(&mut self) -> Option<Self::Item>{
+    fn next(&mut self) -> Option<Self::Item> {
         match self.try_recv() {
             Ok(item) => Some(item),
-            Err(_) => None
+            Err(_) => None,
         }
     }
 }

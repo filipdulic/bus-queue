@@ -1,5 +1,5 @@
 use super::*;
-use std::iter::{Iterator};
+use std::iter::Iterator;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -117,19 +117,19 @@ impl<T: Send> Clone for Subscriber<T> {
 impl<'a, T: Send> Iterator for &'a Subscriber<T> {
     type Item = Arc<T>;
 
-    fn next(&mut self) -> Option<Self::Item>{
+    fn next(&mut self) -> Option<Self::Item> {
         match self.recv() {
             Ok(item) => Some(item),
-            Err(_) => None
+            Err(_) => None,
         }
     }
 }
 impl<T: Send> Iterator for Subscriber<T> {
     type Item = Arc<T>;
-    fn next(&mut self) -> Option<Self::Item>{
+    fn next(&mut self) -> Option<Self::Item> {
         match self.recv() {
             Ok(item) => Some(item),
-            Err(_) => None
+            Err(_) => None,
         }
     }
 }
