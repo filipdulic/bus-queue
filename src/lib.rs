@@ -180,8 +180,8 @@ impl<T: Send> BarePublisher<T> {
         if self.sub_cnt.load(Ordering::Relaxed) == 0 {
             return Err(SendError(object));
         }
-        self.buffer[self.wi.load(Ordering::Acquire) % self.size].store(Some(Arc::new(object)));
         self.wi.fetch_add(1, Ordering::Release);
+        self.buffer[self.wi.load(Ordering::Acquire) % self.size].store(Some(Arc::new(object)));
         Ok(())
     }
 }
