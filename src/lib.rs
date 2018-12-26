@@ -163,12 +163,12 @@ pub fn bare_channel<T: Send>(size: usize) -> (BarePublisher<T>, BareSubscriber<T
             pub_available: pub_available.clone(),
         },
         BareSubscriber {
-            buffer: buffer.clone(),
+            buffer,
             size,
-            wi: wi.clone(),
-            ri: AtomicUsize::new(0),
-            sub_cnt: sub_cnt.clone(),
-            pub_available: pub_available.clone(),
+            wi,
+            ri: 0,
+            sub_cnt,
+            pub_available,
         },
     )
 }
@@ -254,10 +254,7 @@ impl<T: Send> Iterator for BareSubscriber<T> {
     type Item = Arc<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.try_recv() {
-            Ok(item) => Some(item),
-            Err(_) => None,
-        }
+        self.try_recv().ok()
     }
 }
 /// Helper struct used by sync and async implementations to wake Tasks / Threads
@@ -300,7 +297,7 @@ fn alarm<T>(current: T) -> (Waker<T>, Sleeper<T>) {
             receiver,
         },
         Sleeper {
-            sleeper: arc_t.clone(),
+            sleeper: arc_t,
             sender,
         },
     )

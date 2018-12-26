@@ -127,9 +127,6 @@ impl<'a, T: Send> Iterator for &'a Subscriber<T> {
 impl<T: Send> Iterator for Subscriber<T> {
     type Item = Arc<T>;
     fn next(&mut self) -> Option<Self::Item> {
-        match self.recv() {
-            Ok(item) => Some(item),
-            Err(_) => None,
-        }
+        self.recv().ok()
     }
 }
