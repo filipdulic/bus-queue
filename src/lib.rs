@@ -147,6 +147,7 @@ pub struct BareSubscriber<T: Send> {
 
 /// Function used to create and initialise a ( BarePublisher, BareSubscriber ) tuple.
 pub fn bare_channel<T: Send>(size: usize) -> (BarePublisher<T>, BareSubscriber<T>) {
+    let size = size + 1;
     let mut buffer = Vec::new();
     buffer.resize(size, ArcSwapOption::new(None));
     let buffer = Arc::new(buffer);
@@ -217,8 +218,8 @@ impl<T: Send> BareSubscriber<T> {
         loop {
             let val = self.buffer[self.ri() % self.size].load().unwrap();
 
-            if self.wi() > self.ri() + self.size {
-                self.ri.store(self.wi() - self.size, Ordering::Relaxed);
+            if self.wi() >= self.ri() + self.size {
+                self.ri.store(self.wi() - self.size + 1, Ordering::Relaxed);
             } else {
                 self.ri.fetch_add(1, Ordering::Relaxed);
                 return Ok(val);
