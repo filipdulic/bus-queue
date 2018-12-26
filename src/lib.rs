@@ -180,8 +180,8 @@ impl<T: Send> BarePublisher<T> {
         if self.sub_cnt.load(Ordering::Relaxed) == 0 {
             return Err(SendError(object));
         }
-        self.buffer[self.wi.load(Ordering::Relaxed) % self.size].store(Some(Arc::new(object)));
-        self.wi.fetch_add(1, Ordering::Relaxed);
+        self.buffer[self.wi.load(Ordering::Acquire) % self.size].store(Some(Arc::new(object)));
+        self.wi.fetch_add(1, Ordering::Release);
         Ok(())
     }
 }
@@ -195,28 +195,33 @@ impl<T: Send> Drop for BarePublisher<T> {
 impl<T: Send> BareSubscriber<T> {
     /// Receives some atomic reference to an object if queue is not empty, or None if it is. Never
     /// Blocks
+    #[inline(always)]
+    fn ri(&self) -> usize {
+        self.ri.load(Ordering::Relaxed)
+    }
+
+    #[inline(always)]
+    fn wi(&self) -> usize {
+        self.wi.load(Ordering::Acquire)
+    }
+
     pub fn try_recv(&self) -> Result<Arc<T>, TryRecvError> {
-        if self.ri.load(Ordering::Relaxed) == self.wi.load(Ordering::Relaxed) {
-            if self.pub_available.load(Ordering::Relaxed) == false {
+        if self.ri() == self.wi() {
+            if self.pub_available.load(Ordering::Relaxed) {
+                return Err(TryRecvError::Empty);
+            } else {
                 return Err(TryRecvError::Disconnected);
             }
-            return Err(TryRecvError::Empty);
         }
+
         loop {
-            match self.buffer[self.ri.load(Ordering::Relaxed) % self.size].load() {
-                Some(some) => {
-                    if self.wi.load(Ordering::Relaxed) > self.ri.load(Ordering::Relaxed) + self.size
-                    {
-                        self.ri.store(
-                            self.wi.load(Ordering::Relaxed) - self.size,
-                            Ordering::Relaxed,
-                        );
-                    } else {
-                        self.ri.fetch_add(1, Ordering::Relaxed);
-                        return Ok(some);
-                    }
-                }
-                None => unreachable!(),
+            let val = self.buffer[self.ri() % self.size].load().unwrap();
+
+            if self.wi() > self.ri() + self.size {
+                self.ri.store(self.wi() - self.size, Ordering::Relaxed);
+            } else {
+                self.ri.fetch_add(1, Ordering::Relaxed);
+                return Ok(val);
             }
         }
     }
@@ -226,7 +231,7 @@ impl<T: Send> BareSubscriber<T> {
 /// Publisher the initial object was subscribed to.
 impl<T: Send> Clone for BareSubscriber<T> {
     fn clone(&self) -> Self {
-        self.sub_cnt.fetch_add(1, Ordering::Relaxed);
+        self.sub_cnt.fetch_add(1, Ordering::Release);
         Self {
             buffer: self.buffer.clone(),
             wi: self.wi.clone(),
