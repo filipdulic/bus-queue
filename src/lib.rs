@@ -121,8 +121,10 @@
 //! [`unwrap`]: ../../../std/result/enum.Result.html#method.unwrap
 extern crate arc_swap;
 use arc_swap::{ArcSwap, ArcSwapOption};
+use std::cell::RefCell;
 use std::fmt;
 use std::iter::Iterator;
+use std::marker::PhantomData;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 use std::sync::{atomic::AtomicBool, atomic::AtomicUsize, atomic::Ordering, mpsc, Arc};
 
@@ -168,6 +170,7 @@ pub struct BarePublisher<T: Send> {
     wi: Arc<AtomicCounter>,
     sub_cnt: Arc<AtomicCounter>,
     is_pub_available: Arc<AtomicBool>,
+    phantom: PhantomData<*mut ()>,
 }
 
 /// Bare implementation of the subscriber.
@@ -179,6 +182,7 @@ pub struct BareSubscriber<T: Send> {
     size: usize,
     sub_cnt: Arc<AtomicCounter>,
     is_pub_available: Arc<AtomicBool>,
+    phantom: PhantomData<*mut ()>,
 }
 
 /// Function used to create and initialise a ( BarePublisher, BareSubscriber ) tuple.
@@ -197,6 +201,7 @@ pub fn bare_channel<T: Send>(size: usize) -> (BarePublisher<T>, BareSubscriber<T
             wi: wi.clone(),
             sub_cnt: sub_cnt.clone(),
             is_pub_available: is_pub_available.clone(),
+            phantom: PhantomData,
         },
         BareSubscriber {
             buffer,
@@ -205,6 +210,7 @@ pub fn bare_channel<T: Send>(size: usize) -> (BarePublisher<T>, BareSubscriber<T
             ri: AtomicCounter::new(0),
             sub_cnt,
             is_pub_available,
+            phantom: PhantomData,
         },
     )
 }
@@ -214,7 +220,7 @@ impl<T: Send> BarePublisher<T> {
     /// # Arguments
     /// * `object` - owned object to be published
 
-    pub fn broadcast(&mut self, object: T) -> Result<(), SendError<T>> {
+    pub fn broadcast(&self, object: T) -> Result<(), SendError<T>> {
         if self.sub_cnt.get() == 0 {
             return Err(SendError(object));
         }
@@ -271,6 +277,7 @@ impl<T: Send> Clone for BareSubscriber<T> {
             size: self.size,
             sub_cnt: Arc::new(AtomicCounter::new(self.sub_cnt.get())),
             is_pub_available: self.is_pub_available.clone(),
+            phantom: PhantomData,
         }
     }
 }
@@ -288,11 +295,16 @@ impl<T: Send> Iterator for BareSubscriber<T> {
         self.try_recv().ok()
     }
 }
+unsafe impl<T: Send> Send for BarePublisher<T> {}
+unsafe impl<T: Send> Send for BareSubscriber<T> {}
+//impl<T: Send> !Sync for BarePublisher<T>{}
+//impl<T: Send> !Sync for BareSubscriber<T>{}
+
 /// Helper struct used by sync and async implementations to wake Tasks / Threads
 #[derive(Debug)]
 struct Waker<T> {
     /// Vector of Tasks / Threads to be woken up.
-    pub sleepers: Vec<Arc<T>>,
+    pub sleepers: RefCell<Vec<Arc<T>>>,
     /// A mpsc Receiver used to receive Tasks / Threads to be registered.
     receiver: mpsc::Receiver<Arc<T>>,
 }
@@ -309,9 +321,9 @@ struct Sleeper<T> {
 
 impl<T> Waker<T> {
     /// Register all the Tasks / Threads sent for registration.
-    pub fn register_receivers(&mut self) {
+    pub fn register_receivers(&self) {
         for receiver in self.receiver.try_recv() {
-            self.sleepers.push(receiver);
+            self.sleepers.borrow_mut().push(receiver);
         }
     }
 }
@@ -324,7 +336,7 @@ fn alarm<T>(current: T) -> (Waker<T>, Sleeper<T>) {
     vec.push(arc_t.clone());
     (
         Waker {
-            sleepers: vec,
+            sleepers: RefCell::new(vec),
             receiver,
         },
         Sleeper {

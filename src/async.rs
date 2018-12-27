@@ -28,7 +28,7 @@ pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
 }
 impl<T: Send> Publisher<T> {
     fn wake_all(&self) {
-        for sleeper in &self.waker.sleepers {
+        for sleeper in self.waker.sleepers.borrow().iter() {
             sleeper.notify();
         }
     }
@@ -40,7 +40,9 @@ impl<T: Send> Sink for Publisher<T> {
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         self.waker.register_receivers();
-        self.bare_publisher.broadcast(item).map(|_| AsyncSink::Ready)
+        self.bare_publisher
+            .broadcast(item)
+            .map(|_| AsyncSink::Ready)
     }
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         self.wake_all();

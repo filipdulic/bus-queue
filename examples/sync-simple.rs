@@ -4,7 +4,7 @@ use bus_queue::sync;
 use std::thread;
 fn main() {
     // Create a sync channel
-    let (mut tx, rx) = sync::channel(1);
+    let (tx, rx) = sync::channel(1);
     let t = thread::spawn(move || {
         let received = rx.recv().unwrap();
         assert_eq!(*received, 10);
