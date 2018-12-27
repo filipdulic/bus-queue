@@ -121,28 +121,60 @@
 //! [`unwrap`]: ../../../std/result/enum.Result.html#method.unwrap
 extern crate arc_swap;
 use arc_swap::{ArcSwap, ArcSwapOption};
+use std::fmt;
 use std::iter::Iterator;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 use std::sync::{atomic::AtomicBool, atomic::AtomicUsize, atomic::Ordering, mpsc, Arc};
+
+struct AtomicCounter {
+    count: AtomicUsize,
+}
+
+impl AtomicCounter {
+    fn new(c: usize) -> Self {
+        AtomicCounter {
+            count: AtomicUsize::new(c),
+        }
+    }
+    #[inline(always)]
+    fn get(&self) -> usize {
+        self.count.load(Ordering::Acquire)
+    }
+    #[inline(always)]
+    fn set(&self, val: usize) {
+        self.count.store(val, Ordering::Release);
+    }
+    #[inline(always)]
+    fn inc(&self) {
+        self.count.fetch_add(1, Ordering::Release);
+    }
+}
+
+impl fmt::Debug for AtomicCounter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AtomicCounter: {}", self.get())
+    }
+}
 
 /// Bare implementation of the publisher.
 #[derive(Debug)]
 pub struct BarePublisher<T: Send> {
     buffer: Arc<Vec<ArcSwapOption<T>>>,
-    wi: Arc<AtomicUsize>,
     size: usize,
-    sub_cnt: Arc<AtomicUsize>,
-    pub_available: Arc<AtomicBool>,
+    wi: Arc<AtomicCounter>,
+    sub_cnt: Arc<AtomicCounter>,
+    is_pub_available: Arc<AtomicBool>,
 }
+
 /// Bare implementation of the subscriber.
 #[derive(Debug)]
 pub struct BareSubscriber<T: Send> {
     buffer: Arc<Vec<ArcSwapOption<T>>>,
-    wi: Arc<AtomicUsize>,
-    ri: AtomicUsize,
+    wi: Arc<AtomicCounter>,
+    ri: AtomicCounter,
     size: usize,
-    sub_cnt: Arc<AtomicUsize>,
-    pub_available: Arc<AtomicBool>,
+    sub_cnt: Arc<AtomicCounter>,
+    is_pub_available: Arc<AtomicBool>,
 }
 
 /// Function used to create and initialise a ( BarePublisher, BareSubscriber ) tuple.
@@ -151,24 +183,24 @@ pub fn bare_channel<T: Send>(size: usize) -> (BarePublisher<T>, BareSubscriber<T
     let mut buffer = Vec::new();
     buffer.resize(size, ArcSwapOption::new(None));
     let buffer = Arc::new(buffer);
-    let sub_cnt = Arc::new(AtomicUsize::new(1));
-    let wi = Arc::new(AtomicUsize::new(0));
-    let pub_available = Arc::new(AtomicBool::new(true));
+    let sub_cnt = Arc::new(AtomicCounter::new(1));
+    let wi = Arc::new(AtomicCounter::new(0));
+    let is_pub_available = Arc::new(AtomicBool::new(true));
     (
         BarePublisher {
             buffer: buffer.clone(),
             size,
             wi: wi.clone(),
             sub_cnt: sub_cnt.clone(),
-            pub_available: pub_available.clone(),
+            is_pub_available: is_pub_available.clone(),
         },
         BareSubscriber {
             buffer,
             size,
             wi,
-            ri: AtomicUsize::new(0),
+            ri: AtomicCounter::new(0),
             sub_cnt,
-            pub_available,
+            is_pub_available,
         },
     )
 }
@@ -177,60 +209,33 @@ impl<T: Send> BarePublisher<T> {
     /// Publishes values to the circular buffer at wi % size
     /// # Arguments
     /// * `object` - owned object to be published
+
     pub fn broadcast(&mut self, object: T) -> Result<(), SendError<T>> {
-        if self.sub_cnt() == 0 {
+        if self.sub_cnt.get() == 0 {
             return Err(SendError(object));
         }
-        self.buffer[self.wi() % self.size].store(Some(Arc::new(object)));
-        self.wi_inc();
+        self.buffer[self.wi.get() % self.size].store(Some(Arc::new(object)));
+        self.wi.inc();
         Ok(())
-    }
-    #[inline(always)]
-    fn wi(&self)->usize{
-        self.wi.load(Ordering::Acquire)
-    }
-    #[inline(always)]
-    fn wi_inc(&self){
-        self.wi.fetch_add(1, Ordering::Release);
-    }
-    #[inline(always)]
-    fn sub_cnt(&self)->usize{
-        self.sub_cnt.load(Ordering::Relaxed)
     }
 }
 /// Drop trait is used to let subscribers know that publisher is no longer available.
 impl<T: Send> Drop for BarePublisher<T> {
     fn drop(&mut self) {
-        self.pub_available.store(false, Ordering::Relaxed);
+        self.is_pub_available.store(false, Ordering::Relaxed);
     }
 }
 
 impl<T: Send> BareSubscriber<T> {
     /// Receives some atomic reference to an object if queue is not empty, or None if it is. Never
     /// Blocks
-    #[inline(always)]
-    fn ri(&self) -> usize {
-        self.ri.load(Ordering::Relaxed)
+    fn is_pub_available(&self) -> bool {
+        self.is_pub_available.load(Ordering::Relaxed)
     }
 
-    #[inline(always)]
-    fn wi(&self) -> usize {
-        self.wi.load(Ordering::Acquire)
-    }
-    #[inline(always)]
-    fn ri_store(&self, to_store: usize) {
-        self.ri.store(to_store, Ordering::Relaxed);
-    }
-    #[inline(always)]
-    fn ri_inc(&self){
-        self.ri.fetch_add(1, Ordering::Relaxed);
-    }
-    fn pub_available(&self)->bool{
-        self.pub_available.load(Ordering::Relaxed)
-    }
     pub fn try_recv(&self) -> Result<Arc<T>, TryRecvError> {
-        if self.ri() == self.wi() {
-            if self.pub_available() {
+        if self.ri.get() == self.wi.get() {
+            if self.is_pub_available() {
                 return Err(TryRecvError::Empty);
             } else {
                 return Err(TryRecvError::Disconnected);
@@ -238,12 +243,12 @@ impl<T: Send> BareSubscriber<T> {
         }
 
         loop {
-            let val = self.buffer[self.ri() % self.size].load().unwrap();
+            let val = self.buffer[self.ri.get() % self.size].load().unwrap();
 
-            if self.wi() >= self.ri() + self.size {
-                self.ri_store(self.wi() - self.size + 1);
+            if self.wi.get() >= self.ri.get() + self.size {
+                self.ri.set(self.wi.get() - self.size + 1);
             } else {
-                self.ri_inc();
+                self.ri.inc();
                 return Ok(val);
             }
         }
@@ -254,21 +259,21 @@ impl<T: Send> BareSubscriber<T> {
 /// Publisher the initial object was subscribed to.
 impl<T: Send> Clone for BareSubscriber<T> {
     fn clone(&self) -> Self {
-        self.sub_cnt.fetch_add(1, Ordering::Release);
+        self.sub_cnt.inc();
         Self {
             buffer: self.buffer.clone(),
             wi: self.wi.clone(),
-            ri: AtomicUsize::new(self.ri.load(Ordering::Relaxed)),
+            ri: AtomicCounter::new(self.ri.get()),
             size: self.size,
-            sub_cnt: self.sub_cnt.clone(),
-            pub_available: self.pub_available.clone(),
+            sub_cnt: Arc::new(AtomicCounter::new(self.sub_cnt.get())),
+            is_pub_available: self.is_pub_available.clone(),
         }
     }
 }
 
 impl<T: Send> Drop for BareSubscriber<T> {
     fn drop(&mut self) {
-        self.sub_cnt.fetch_sub(1, Ordering::Relaxed);
+        self.sub_cnt.inc();
     }
 }
 
