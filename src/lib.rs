@@ -166,7 +166,7 @@ pub fn bare_channel<T: Send>(size: usize) -> (BarePublisher<T>, BareSubscriber<T
             buffer,
             size,
             wi,
-            ri: 0,
+            ri: AtomicUsize::new(0),
             sub_cnt,
             pub_available,
         },
@@ -178,12 +178,24 @@ impl<T: Send> BarePublisher<T> {
     /// # Arguments
     /// * `object` - owned object to be published
     pub fn broadcast(&mut self, object: T) -> Result<(), SendError<T>> {
-        if self.sub_cnt.load(Ordering::Relaxed) == 0 {
+        if self.sub_cnt() == 0 {
             return Err(SendError(object));
         }
-        self.buffer[self.wi.load(Ordering::Acquire) % self.size].store(Some(Arc::new(object)));
-        self.wi.fetch_add(1, Ordering::Release);
+        self.buffer[self.wi() % self.size].store(Some(Arc::new(object)));
+        self.wi_inc();
         Ok(())
+    }
+    #[inline(always)]
+    fn wi(&self)->usize{
+        self.wi.load(Ordering::Acquire)
+    }
+    #[inline(always)]
+    fn wi_inc(&self){
+        self.wi.fetch_add(1, Ordering::Release);
+    }
+    #[inline(always)]
+    fn sub_cnt(&self)->usize{
+        self.sub_cnt.load(Ordering::Relaxed)
     }
 }
 /// Drop trait is used to let subscribers know that publisher is no longer available.
@@ -205,10 +217,20 @@ impl<T: Send> BareSubscriber<T> {
     fn wi(&self) -> usize {
         self.wi.load(Ordering::Acquire)
     }
-
+    #[inline(always)]
+    fn ri_store(&self, to_store: usize) {
+        self.ri.store(to_store, Ordering::Relaxed);
+    }
+    #[inline(always)]
+    fn ri_inc(&self){
+        self.ri.fetch_add(1, Ordering::Relaxed);
+    }
+    fn pub_available(&self)->bool{
+        self.pub_available.load(Ordering::Relaxed)
+    }
     pub fn try_recv(&self) -> Result<Arc<T>, TryRecvError> {
         if self.ri() == self.wi() {
-            if self.pub_available.load(Ordering::Relaxed) {
+            if self.pub_available() {
                 return Err(TryRecvError::Empty);
             } else {
                 return Err(TryRecvError::Disconnected);
@@ -219,9 +241,9 @@ impl<T: Send> BareSubscriber<T> {
             let val = self.buffer[self.ri() % self.size].load().unwrap();
 
             if self.wi() >= self.ri() + self.size {
-                self.ri.store(self.wi() - self.size + 1, Ordering::Relaxed);
+                self.ri_store(self.wi() - self.size + 1);
             } else {
-                self.ri.fetch_add(1, Ordering::Relaxed);
+                self.ri_inc();
                 return Ok(val);
             }
         }
