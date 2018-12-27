@@ -42,7 +42,7 @@
 
 # Examples
 ## Simple bare usage
-```
+```rust
 extern crate bus_queue;
 
 use bus_queue::bare_channel;
@@ -60,7 +60,7 @@ fn main() {
 ```
 
  ## Simple synchronous usage
- ```
+ ```rust
  extern crate bus_queue;
 
  use bus_queue::sync;
@@ -77,7 +77,7 @@ fn main() {
 }
  ```
  ## Simple asynchronous usage
- ```
+ ```rust
  extern crate bus_queue;
  extern crate futures;
  extern crate tokio;
