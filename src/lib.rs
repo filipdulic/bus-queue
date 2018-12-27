@@ -146,7 +146,11 @@ impl AtomicCounter {
     }
     #[inline(always)]
     fn inc(&self) {
-        self.count.fetch_add(1, Ordering::Release);
+        self.count.fetch_add(1, Ordering::AcqRel);
+    }
+    #[inline(always)]
+    fn dec(&self) {
+        self.count.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
@@ -273,7 +277,7 @@ impl<T: Send> Clone for BareSubscriber<T> {
 
 impl<T: Send> Drop for BareSubscriber<T> {
     fn drop(&mut self) {
-        self.sub_cnt.inc();
+        self.sub_cnt.dec();
     }
 }
 
