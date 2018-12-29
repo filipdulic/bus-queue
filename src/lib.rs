@@ -255,8 +255,8 @@ impl<T: Send> BareSubscriber<T> {
         loop {
             let val = self.buffer[self.ri.get() % self.size].load().unwrap();
 
-            if self.wi.get() > self.ri.get() + self.size - 1 {
-                self.ri.set(self.wi.get() - self.size);
+            if self.wi.get() >= self.ri.get() + self.size {
+                self.ri.set(self.wi.get() - self.size + 1);
             } else {
                 self.ri.inc();
                 return Ok(val);
