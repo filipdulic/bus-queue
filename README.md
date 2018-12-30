@@ -19,7 +19,8 @@
  * **sync**/**async** - both interfaces are provided, as well as a bare queue implementation
    without the thread synchronisation ,and futures logic.
  * **std::sync::mpsc** like interface - The API is modeled after the standard library mpsc queue,
-   channel function are used to create a tuple of (Publisher, Subscriber), while the Clone trait on Subscribre
+   channel function are used to create a tuple of (Publisher, Subscriber), while the Clone trait on Subscriber
+   creates additional subscribers to the same Publisher
 
  **sync::Publisher**, **async::Publisher**, and **BarePublisher** are used to broadcast data to
  **sync::Subscriber**, **async::Subscriber**, and **BareSubscriber** pools. Subscribers are
@@ -78,34 +79,26 @@ fn main() {
  ```
  ## Simple asynchronous usage
  ```rust
- extern crate bus_queue;
- extern crate futures;
- extern crate tokio;
+extern crate bus_queue;
+extern crate futures;
+extern crate tokio;
 
- use bus_queue::async;
- use futures::future::Future;
- use futures::*;
- use tokio::runtime::Runtime;
+use bus_queue::async;
+use futures::*;
+use tokio::runtime::Runtime;
 
- fn subscriber(rx: async::Subscriber<i32>) -> impl Future<Item = (), Error = ()> {
-     assert_eq!(
-         rx.map(|x| *x).collect().wait().unwrap(),
-         vec![1, 2, 3, 4, 5]
-     );
-     future::ok(())
- }
+fn main() {
+    let mut rt = Runtime::new().unwrap();
+    let (tx, rx) = async::channel(4);
 
- fn main() {
-     let mut rt = Runtime::new().unwrap();
-     let (tx, rx): (async::Publisher<i32>, async::Subscriber<i32>) = async::channel(10);
+    let publisher = stream::iter_ok(vec![1, 2, 3, 4, 5])
+        .forward(tx)
+        .and_then(|(_, mut sink)| sink.close())
+        .map_err(|_| ())
+        .map(|_| ());
 
-     let publisher = stream::iter_ok(vec![1, 2, 3, 4, 5])
-         .forward(tx)
-         .and_then(|(_, mut sink)| sink.close())
-         .map_err(|_| ())
-         .map(|_| ());
-
-     rt.spawn(publisher);
-     rt.block_on(subscriber(rx)).unwrap();
- }
+    rt.spawn(publisher);
+    let collected = rt.block_on(rx.map(|x| *x).collect()).unwrap();
+    assert_eq!(collected, vec![2, 3, 4, 5]);
+}
  ```
