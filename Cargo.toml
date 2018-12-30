@@ -1,7 +1,7 @@
 [package]
 name = "bus_queue"
-version = "0.3.5"
-authors = ["Filip Dulic <filip.dulic@gmail.com>"]
+version = "0.3.6"
+authors = ["Filip Dulic <filip.dulic@gmail.com>", "Vladan Popovic <vladanovic@gmail.com>", "Bojan Petrovic <bojan_petrovic@fastmail.fm>"]
 description = "Lock-free Bounded non-Blocking Pub-Sub Queue"
 license = "Apache-2.0/MIT"
 keywords = ["pubsub", "lock-free", "queue","async","futures"]
