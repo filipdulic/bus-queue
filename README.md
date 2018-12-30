@@ -49,10 +49,10 @@ extern crate bus_queue;
 use bus_queue::bare_channel;
 
 fn main() {
-    let (mut tx, rx) = bare_channel(10);
+    let (tx, rx) = bare_channel(10);
     (1..15).for_each(|x| tx.broadcast(x).unwrap());
 
-    let received: Vec<i32> = rx.into_iter().map(|x| *x).collect();
+    let received: Vec<i32> = rx.map(|x| *x).collect();
     // Test that only the last 10 elements are in the received list.
     let expected: Vec<i32> = (5..15).collect();
 
@@ -60,25 +60,35 @@ fn main() {
 }
 ```
 
- ## Simple synchronous usage
- ```rust
- extern crate bus_queue;
+## Simple synchronous usage
+```rust
+extern crate bus_queue;
 
- use bus_queue::sync;
- use std::thread;
- fn main() {
+use bus_queue::sync;
+fn main() {
     // Create a sync channel
-    let (mut tx, rx) = sync::channel(1);
-    let t = thread::spawn(move|| {
-        let received = rx.recv().unwrap();
-        assert_eq!(*received, 10);
+    let (tx, rx) = sync::channel(10);
+    // spawn tx thread, broadcast all and drop publisher.
+    let tx_t = std::thread::spawn(move || {
+        (1..15).for_each(|x| tx.broadcast(x).unwrap());
     });
-    tx.broadcast(10).unwrap();
-    t.join().unwrap();
+    // small sleep for the tx thread to send and close, before rx thread is called
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // spawn rx thread to get all the items left in the buffer
+    let rx_t = std::thread::spawn(move || {
+        let received: Vec<i32> = rx.map(|x| *x).collect();
+        // Test that only the last 10 elements are in the received list.
+        let expected: Vec<i32> = (5..15).collect();
+        assert_eq!(received, expected);
+    });
+
+    tx_t.join().unwrap();
+    rx_t.join().unwrap();
 }
- ```
- ## Simple asynchronous usage
- ```rust
+```
+## Simple asynchronous usage
+```rust
 extern crate bus_queue;
 extern crate futures;
 extern crate tokio;
@@ -89,16 +99,19 @@ use tokio::runtime::Runtime;
 
 fn main() {
     let mut rt = Runtime::new().unwrap();
-    let (tx, rx) = async::channel(4);
-
-    let publisher = stream::iter_ok(vec![1, 2, 3, 4, 5])
+    let (tx, rx) = async::channel(10);
+    let sent: Vec<i32> = (1..15).collect();
+    let publisher = stream::iter_ok(sent)
         .forward(tx)
         .and_then(|(_, mut sink)| sink.close())
         .map_err(|_| ())
         .map(|_| ());
 
     rt.spawn(publisher);
-    let collected = rt.block_on(rx.map(|x| *x).collect()).unwrap();
-    assert_eq!(collected, vec![2, 3, 4, 5]);
+
+    let received: Vec<i32> = rt.block_on(rx.map(|x| *x).collect()).unwrap();
+    // Test that only the last 10 elements are in the received list.
+    let expected: Vec<i32> = (5..15).collect();
+    assert_eq!(expected, received);
 }
- ```
+```
