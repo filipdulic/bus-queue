@@ -40,9 +40,10 @@ impl<T: Send> Sink for Publisher<T> {
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         self.waker.register_receivers();
-        self.bare_publisher
-            .broadcast(item)
-            .map(|_| {self.wake_all();AsyncSink::Ready})
+        self.bare_publisher.broadcast(item).map(|_| {
+            self.wake_all();
+            AsyncSink::Ready
+        })
     }
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         Ok(Async::Ready(()))
