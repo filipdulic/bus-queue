@@ -357,4 +357,4 @@ pub mod sync;
 #[cfg(feature = "async")]
 extern crate futures;
 #[cfg(feature = "async")]
-pub mod async;
+pub mod async_;

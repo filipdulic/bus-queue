@@ -2,13 +2,13 @@ extern crate bus_queue;
 extern crate futures;
 extern crate tokio;
 
-use bus_queue::async;
+use bus_queue::async_;
 use futures::*;
 use tokio::runtime::Runtime;
 
 fn main() {
     let mut rt = Runtime::new().unwrap();
-    let (tx, rx) = async::channel(10);
+    let (tx, rx) = async_::channel(10);
     let sent: Vec<i32> = (1..15).collect();
     let publisher = stream::iter_ok(sent)
         .forward(tx)
