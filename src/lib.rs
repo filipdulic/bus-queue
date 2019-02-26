@@ -357,4 +357,9 @@ pub mod sync;
 #[cfg(feature = "async")]
 extern crate futures;
 #[cfg(feature = "async")]
-pub mod async;
+pub mod async_;
+#[cfg(feature = "async")]
+#[deprecated(since = "0.3.8", note = "Renamed to async_ to avoid conflict with keyword.")]
+pub mod async {
+  pub use super::async_::*;
+}
