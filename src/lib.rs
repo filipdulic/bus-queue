@@ -309,7 +309,7 @@ unsafe impl<T: Send> Send for BareSubscriber<T> {}
 
 /// Helper struct used by sync and async implementations to wake Tasks / Threads
 #[derive(Debug)]
-struct Waker<T> {
+pub struct Waker<T> {
     /// Vector of Tasks / Threads to be woken up.
     pub sleepers: RefCell<Vec<Arc<T>>>,
     /// A mpsc Receiver used to receive Tasks / Threads to be registered.
@@ -319,7 +319,7 @@ struct Waker<T> {
 /// Helper struct used by sync and async implementations to register Tasks / Threads to
 /// be woken up.
 #[derive(Debug)]
-struct Sleeper<T> {
+pub struct Sleeper<T> {
     /// Current Task / Thread to be woken up.
     pub sleeper: Arc<T>,
     /// mpsc Sender used to register Task / Thread.
@@ -336,7 +336,7 @@ impl<T> Waker<T> {
 }
 
 /// Function used to create a ( Waker, Sleeper ) tuple.
-fn alarm<T>(current: T) -> (Waker<T>, Sleeper<T>) {
+pub fn alarm<T>(current: T) -> (Waker<T>, Sleeper<T>) {
     let mut vec = Vec::new();
     let (sender, receiver) = mpsc::channel();
     let arc_t = Arc::new(current);
