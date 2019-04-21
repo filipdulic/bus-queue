@@ -59,6 +59,14 @@ impl<T: Send> Drop for Publisher<T> {
     }
 }
 
+impl<T: Send> PartialEq for Publisher<T> {
+    fn eq(&self, other: &Publisher<T>) -> bool {
+        self.bare_publisher == other.bare_publisher
+    }
+}
+
+impl<T: Send> Eq for Publisher<T> {}
+
 impl<T: Send> Subscriber<T> {
     pub fn try_recv(&self) -> Result<Arc<T>, TryRecvError> {
         self.bare_subscriber.try_recv()
@@ -130,3 +138,11 @@ impl<T: Send> Iterator for Subscriber<T> {
         self.recv().ok()
     }
 }
+
+impl<T: Send> PartialEq for Subscriber<T> {
+    fn eq(&self, other: &Subscriber<T>) -> bool {
+        self.bare_subscriber == other.bare_subscriber
+    }
+}
+
+impl<T: Send> Eq for Subscriber<T> {}

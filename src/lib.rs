@@ -169,6 +169,14 @@ impl fmt::Debug for AtomicCounter {
     }
 }
 
+impl PartialEq for AtomicCounter {
+    fn eq(&self, other: &AtomicCounter) -> bool {
+        self.count.load(Ordering::AcqRel) == other.count.load(Ordering::AcqRel)
+    }
+}
+
+impl Eq for AtomicCounter {}
+
 /// Bare implementation of the publisher.
 #[derive(Debug)]
 pub struct BarePublisher<T: Send> {
@@ -243,6 +251,14 @@ impl<T: Send> Drop for BarePublisher<T> {
     }
 }
 
+impl<T: Send> PartialEq for BarePublisher<T> {
+    fn eq(&self, other: &BarePublisher<T>) -> bool {
+        Arc::ptr_eq(&self.buffer, &other.buffer)
+    }
+}
+
+impl<T: Send> Eq for BarePublisher<T> {}
+
 impl<T: Send> BareSubscriber<T> {
     /// Receives some atomic reference to an object if queue is not empty, or None if it is. Never
     /// Blocks
@@ -294,6 +310,14 @@ impl<T: Send> Drop for BareSubscriber<T> {
         self.sub_cnt.dec();
     }
 }
+
+impl<T: Send> PartialEq for BareSubscriber<T> {
+    fn eq(&self, other: &BareSubscriber<T>) -> bool {
+        Arc::ptr_eq(&self.buffer, &other.buffer) && self.ri == other.ri
+    }
+}
+
+impl<T: Send> Eq for BareSubscriber<T> {}
 
 impl<T: Send> Iterator for BareSubscriber<T> {
     type Item = Arc<T>;
@@ -359,7 +383,10 @@ extern crate futures;
 #[cfg(feature = "async")]
 pub mod async_;
 #[cfg(feature = "async")]
-#[deprecated(since = "0.3.8", note = "Renamed to async_ to avoid conflict with keyword.")]
+#[deprecated(
+    since = "0.3.8",
+    note = "Renamed to async_ to avoid conflict with keyword."
+)]
 pub mod async {
-  pub use super::async_::*;
+    pub use super::async_::*;
 }
