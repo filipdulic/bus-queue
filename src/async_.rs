@@ -1,6 +1,7 @@
 use super::*;
 use futures::prelude::*;
 use futures::{task::AtomicTask, Async, AsyncSink};
+
 #[derive(Debug)]
 pub struct Publisher<T: Send> {
     bare_publisher: BarePublisher<T>,
@@ -60,6 +61,14 @@ impl<T: Send> Drop for Publisher<T> {
     }
 }
 
+impl<T: Send> PartialEq for Publisher<T> {
+    fn eq(&self, other: &Publisher<T>) -> bool {
+        self.bare_publisher == other.bare_publisher
+    }
+}
+
+impl<T: Send> Eq for Publisher<T> {}
+
 impl<T: Send> Stream for Subscriber<T> {
     type Item = Arc<T>;
     type Error = ();
@@ -90,3 +99,11 @@ impl<T: Send> Clone for Subscriber<T> {
         }
     }
 }
+
+impl<T: Send> PartialEq for Subscriber<T> {
+    fn eq(&self, other: &Subscriber<T>) -> bool {
+        self.bare_subscriber == other.bare_subscriber
+    }
+}
+
+impl<T: Send> Eq for Subscriber<T> {}
