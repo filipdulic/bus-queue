@@ -40,7 +40,7 @@ impl<T: Send> Publisher<T> {
     /// Publishes values to the circular buffer at wi % size
     /// # Arguments
     /// * `object` - owned object to be published
-    pub fn broadcast(&self, object: T) -> Result<(), SendError<T>> {
+    pub fn broadcast(&mut self, object: T) -> Result<(), SendError<T>> {
         self.bare_publisher.broadcast(object)?;
         self.waker.register_receivers();
         self.wake_all();
