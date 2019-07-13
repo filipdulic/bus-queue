@@ -66,7 +66,7 @@
 //! use bus_queue::sync;
 //! fn main() {
 //!     // Create a sync channel
-//!     let (tx, rx) = sync::channel(10);
+//!     let (mut tx, rx) = sync::channel(10);
 //!     // spawn tx thread, broadcast all and drop publisher.
 //!     let tx_t = std::thread::spawn(move || {
 //!         (1..15).for_each(|x| tx.broadcast(x).unwrap());
@@ -92,13 +92,13 @@
 //! extern crate futures;
 //! extern crate tokio;
 //!
-//! use bus_queue::async;
+//! use bus_queue::async_;
 //! use futures::*;
 //! use tokio::runtime::Runtime;
 //!
 //! fn main() {
 //!     let mut rt = Runtime::new().unwrap();
-//!     let (tx, rx) = async::channel(10);
+//!     let (tx, rx) = async_::channel(10);
 //!     let sent: Vec<i32> = (1..15).collect();
 //!     let publisher = stream::iter_ok(sent)
 //!         .forward(tx)
@@ -129,7 +129,6 @@
 extern crate arc_swap;
 extern crate lockfree;
 use arc_swap::{ArcSwap, ArcSwapOption};
-use std::cell::RefCell;
 use std::fmt;
 use std::iter::Iterator;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
@@ -231,7 +230,7 @@ impl<T: Send> BarePublisher<T> {
     /// # Arguments
     /// * `object` - owned object to be published
 
-    pub fn broadcast(&mut self, object: T) -> Result<(), SendError<T>> {
+    pub fn broadcast(&self, object: T) -> Result<(), SendError<T>> {
         if self.sub_cnt.get() == 0 {
             return Err(SendError(object));
         }
@@ -321,16 +320,12 @@ impl<T: Send> Iterator for BareSubscriber<T> {
         self.try_recv().ok()
     }
 }
-//unsafe impl<T: Send> Send for BarePublisher<T> {}
-//unsafe impl<T: Send> Send for BareSubscriber<T> {}
-//impl<T: Send> !Sync for BarePublisher<T>{}
-//impl<T: Send> !Sync for BareSubscriber<T>{}
 
 /// Helper struct used by sync and async implementations to wake Tasks / Threads
 #[derive(Debug)]
 pub struct Waker<T> {
     /// Vector of Tasks / Threads to be woken up.
-    pub sleepers: RefCell<Vec<Arc<T>>>,
+    pub sleepers: Vec<Arc<T>>,
     /// A mpsc Receiver used to receive Tasks / Threads to be registered.
     receiver: lockfree::channel::mpsc::Receiver<Arc<T>>,
 }
@@ -349,7 +344,7 @@ impl<T> Waker<T> {
     /// Register all the Tasks / Threads sent for registration.
     pub fn register_receivers(&mut self) {
         for receiver in self.receiver.recv() {
-            self.sleepers.borrow_mut().push(receiver);
+            self.sleepers.push(receiver);
         }
     }
 }
@@ -362,7 +357,7 @@ pub fn alarm<T>(current: T) -> (Waker<T>, Sleeper<T>) {
     vec.push(arc_t.clone());
     (
         Waker {
-            sleepers: RefCell::new(vec),
+            sleepers: vec,
             receiver,
         },
         Sleeper {

@@ -47,7 +47,7 @@ impl<T: Send> Publisher<T> {
         Ok(())
     }
     pub fn wake_all(&self) {
-        for sleeper in self.waker.sleepers.borrow().iter() {
+        for sleeper in self.waker.sleepers.iter() {
             sleeper.load().unpark();
         }
     }
