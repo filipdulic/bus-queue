@@ -1,6 +1,6 @@
 [package]
 name = "bus_queue"
-version = "0.3.10"
+version = "0.4.0"
 authors = ["Filip Dulic <filip.dulic@gmail.com>", "Vladan Popovic <vladanovic@gmail.com>", "Bojan Petrovic <bojan_petrovic@fastmail.fm>"]
 description = "Lock-free Bounded non-Blocking Pub-Sub Queue"
 license = "Apache-2.0/MIT"
@@ -9,6 +9,7 @@ repository = "https://github.com/filipdulic/bus-queue"
 readme = "README.md"
 
 [dependencies]
+lockfree = "*"
 arc-swap = "0.3.6"
 futures = {version = "0.1", optional = true}
 tokio = {version = "0.1", optional = true}

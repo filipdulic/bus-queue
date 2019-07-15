@@ -3,7 +3,7 @@ extern crate bus_queue;
 use bus_queue::sync;
 fn main() {
     // Create a sync channel
-    let (tx, rx) = sync::channel(10);
+    let (mut tx, rx) = sync::channel(10);
     // spawn tx thread, broadcast all and drop publisher.
     let tx_t = std::thread::spawn(move || {
         (1..15).for_each(|x| tx.broadcast(x).unwrap());

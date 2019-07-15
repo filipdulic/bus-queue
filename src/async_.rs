@@ -29,7 +29,7 @@ pub fn channel<T: Send>(size: usize) -> (Publisher<T>, Subscriber<T>) {
 }
 impl<T: Send> Publisher<T> {
     fn wake_all(&self) {
-        for sleeper in self.waker.sleepers.borrow().iter() {
+        for sleeper in self.waker.sleepers.iter() {
             sleeper.notify();
         }
     }
