@@ -53,6 +53,12 @@ impl<T: Send> Publisher<T> {
     }
 }
 
+impl<T: Send> GetSubCount for Publisher<T> {
+    fn get_sub_count(&self) -> usize {
+        self.bare_publisher.get_sub_count()
+    }
+}
+
 impl<T: Send> Drop for Publisher<T> {
     fn drop(&mut self) {
         self.wake_all();

@@ -35,6 +35,12 @@ impl<T: Send> Publisher<T> {
     }
 }
 
+impl<T: Send> GetSubCount for Publisher<T> {
+    fn get_sub_count(&self) -> usize {
+        self.bare_publisher.get_sub_count()
+    }
+}
+
 impl<T: Send> Sink for Publisher<T> {
     type SinkItem = T;
     type SinkError = SendError<T>;
