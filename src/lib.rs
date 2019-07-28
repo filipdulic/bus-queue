@@ -197,6 +197,9 @@ pub struct BareSubscriber<T: Send> {
     is_pub_available: Arc<AtomicBool>,
 }
 
+pub trait GetSubCount {
+    fn get_sub_count(&self) -> usize;
+}
 /// Function used to create and initialise a ( BarePublisher, BareSubscriber ) tuple.
 pub fn bare_channel<T: Send>(size: usize) -> (BarePublisher<T>, BareSubscriber<T>) {
     let size = size + 1;
@@ -237,6 +240,12 @@ impl<T: Send> BarePublisher<T> {
         self.buffer[self.wi.get() % self.size].store(Some(Arc::new(object)));
         self.wi.inc();
         Ok(())
+    }
+}
+
+impl<T: Send> GetSubCount for BarePublisher<T> {
+    fn get_sub_count(&self) -> usize {
+        self.sub_cnt.get()
     }
 }
 /// Drop trait is used to let subscribers know that publisher is no longer available.
