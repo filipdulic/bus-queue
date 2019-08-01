@@ -94,7 +94,7 @@
 //!
 //! use bus_queue::async_;
 //! use futures::*;
-//! use tokio::runtime::Runtime;
+//! use tokio::runtime::current_thread::Runtime;
 //!
 //! fn main() {
 //!     let mut rt = Runtime::new().unwrap();
