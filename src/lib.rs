@@ -376,6 +376,8 @@ pub fn alarm<T>(current: T) -> (Waker<T>, Sleeper<T>) {
     )
 }
 
+#[cfg(test)]
+extern crate tokio;
 pub mod sync;
 #[cfg(feature = "async")]
 extern crate futures;
