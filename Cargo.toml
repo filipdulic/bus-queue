@@ -7,27 +7,17 @@ license = "Apache-2.0/MIT"
 keywords = ["pubsub", "lock-free", "queue","async","futures"]
 repository = "https://github.com/filipdulic/bus-queue"
 readme = "README.md"
+edition = "2018"
 
 [dependencies]
-lockfree = "^0.5.1"
-arc-swap = "0.3.6"
-futures = {version = "0.1", optional = true}
-tokio = {version = "0.1", optional = true}
-
-[features]
-default = ["async"]
-async = ["futures"]
-async-example = ["tokio"]
+arc-swap = "0.4.2"
+futures = { version = "=0.3.0-alpha.18", package = "futures-preview", features = ["async-await", "nightly"] }
+crossbeam-channel = "0.3.9"
 
 [[example]]
-name = "bare-simple"
-path = "examples/bare-simple.rs"
-
-[[example]]
-name = "sync-simple"
-path = "examples/sync-simple.rs"
+name = "raw-simple"
+path = "examples/raw-simple.rs"
 
 [[example]]
 name = "async-simple"
 path = "examples/async-simple.rs"
-required-features = ["async-example"]
