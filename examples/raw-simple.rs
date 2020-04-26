@@ -3,7 +3,7 @@ extern crate bus_queue;
 use bus_queue::raw_bounded;
 
 fn main() {
-    let (tx, rx) = raw_bounded(10);
+    let (tx, rx) = raw_bounded(10, 0);
     (1..15).for_each(|x| tx.broadcast(x).unwrap());
 
     let received: Vec<i32> = rx.map(|x| *x).collect();

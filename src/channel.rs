@@ -7,7 +7,7 @@ use std::fmt::Debug;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
 /// Function used to create and initialise a (Sender, Receiver) tuple.
-pub fn bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
+pub fn bounded<T>(size: usize, missed_items_size: usize) -> (Sender<T>, Receiver<T>) {
     let mut buffer = Vec::new();
     buffer.resize(size, ArcSwapOption::new(None));
     let buffer = Arc::new(buffer);
@@ -31,6 +31,7 @@ pub fn bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
             ri: AtomicCounter::new(0),
             sub_count,
             is_sender_available,
+            missed_items_size,
         },
     )
 }
@@ -65,6 +66,8 @@ pub struct Receiver<T> {
     sub_count: Arc<AtomicCounter>,
     /// true if the sender is available
     is_sender_available: Arc<AtomicBool>,
+    /// how many items should the receiver miss when the writer overflows
+    missed_items_size: usize,
 }
 
 impl<T> Sender<T> {
@@ -117,7 +120,8 @@ impl<T> Receiver<T> {
         // Reader has not read enough to keep up with (writer - buffer size) so
         // set the reader pointer to be (writer - buffer size)
         if self.wi.get() - self.ri.get() >= self.size {
-            self.ri.set(self.wi.get() - self.size);
+            self.ri
+                .set(self.wi.get() - self.size + self.missed_items_size);
         }
         let val = self.buffer[self.ri.get() % self.size].load_full().unwrap();
         self.ri.inc();
@@ -136,6 +140,7 @@ impl<T> Clone for Receiver<T> {
             size: self.size,
             sub_count: Arc::clone(&self.sub_count),
             is_sender_available: self.is_sender_available.clone(),
+            missed_items_size: self.missed_items_size,
         }
     }
 }
@@ -168,7 +173,7 @@ mod test {
 
     #[test]
     fn subcount() {
-        let (sender, receiver) = bounded::<()>(1);
+        let (sender, receiver) = bounded::<()>(1, 0);
         let receiver2 = receiver.clone();
         assert_eq!(sender.sub_count.get(), 2);
         assert_eq!(receiver.sub_count.get(), 2);
@@ -181,14 +186,14 @@ mod test {
 
     #[test]
     fn eq() {
-        let (_sender, receiver) = bounded::<()>(1);
+        let (_sender, receiver) = bounded::<()>(1, 0);
         let receiver2 = receiver.clone();
         assert_eq!(receiver, receiver2);
     }
 
     #[test]
     fn bounded_channel() {
-        let (sender, receiver) = bounded(1);
+        let (sender, receiver) = bounded(1, 0);
         let receiver2 = receiver.clone();
         sender.broadcast(123).unwrap();
         assert_eq!(*receiver.try_recv().unwrap(), 123);
@@ -197,7 +202,7 @@ mod test {
 
     #[test]
     fn bounded_channel_no_subs() {
-        let (sender, receiver) = bounded(1);
+        let (sender, receiver) = bounded(1, 1);
         drop(receiver);
         let err = sender.broadcast(123);
         assert!(err.is_err());
@@ -205,21 +210,21 @@ mod test {
 
     #[test]
     fn bounded_channel_no_sender() {
-        let (sender, receiver) = bounded::<()>(1);
+        let (sender, receiver) = bounded::<()>(1, 0);
         drop(sender);
         assert_eq!(receiver.is_sender_available(), false);
     }
 
     #[test]
     fn bounded_channel_size() {
-        let (sender, receiver) = bounded::<()>(3);
+        let (sender, receiver) = bounded::<()>(3, 0);
         assert_eq!(sender.buffer.len(), 3);
         assert_eq!(receiver.buffer.len(), 3);
     }
 
     #[test]
     fn bounded_within_size() {
-        let (sender, receiver) = bounded(3);
+        let (sender, receiver) = bounded(3, 0);
         assert_eq!(sender.buffer.len(), 3);
 
         for i in 0..3 {
@@ -232,7 +237,7 @@ mod test {
 
     #[test]
     fn bounded_overflow() {
-        let (sender, receiver) = bounded(3);
+        let (sender, receiver) = bounded(3, 0);
         assert_eq!(sender.buffer.len(), 3);
 
         for i in 0..4 {
@@ -245,7 +250,7 @@ mod test {
 
     #[test]
     fn bounded_overflow_with_reads() {
-        let (sender, receiver) = bounded(3);
+        let (sender, receiver) = bounded(3, 0);
         assert_eq!(sender.buffer.len(), 3);
 
         for i in 0..3 {
