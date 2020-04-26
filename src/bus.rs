@@ -1,12 +1,15 @@
 use crate::channel::{bounded as raw_bounded, Receiver, SendError, Sender, TryRecvError};
 use crossbeam_channel as mpsc;
 use futures::task::AtomicWaker;
-use futures::{task, Poll, Sink, Stream};
+use futures::{
+    task::{self, Poll},
+    Sink, Stream,
+};
 use std::pin::Pin;
 use std::sync::Arc;
 
-pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
-    let (sender, receiver) = raw_bounded(size);
+pub fn bounded<T>(size: usize, missed_items_size: usize) -> (Publisher<T>, Subscriber<T>) {
+    let (sender, receiver) = raw_bounded(size, missed_items_size);
     let (waker, sleeper) = alarm();
     (
         Publisher { sender, waker },
@@ -170,7 +173,7 @@ mod test {
 
     #[test]
     fn channel() {
-        let (publisher, subscriber1) = super::bounded(10);
+        let (publisher, subscriber1) = super::bounded(10, 0);
         let subscriber2 = subscriber1.clone();
 
         block_on(async move {
