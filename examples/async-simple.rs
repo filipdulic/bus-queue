@@ -1,25 +1,24 @@
-extern crate bus_queue;
-extern crate futures;
-extern crate tokio;
-
-use bus_queue::async_;
-use futures::*;
-use tokio::runtime::Runtime;
+use bus_queue::bounded;
+use futures::executor::block_on;
+use futures::stream;
+use futures::StreamExt;
 
 fn main() {
-    let mut rt = Runtime::new().unwrap();
-    let (tx, rx) = async_::channel(10);
-    let sent: Vec<i32> = (1..15).collect();
-    let publisher = stream::iter_ok(sent)
-        .forward(tx)
-        .and_then(|(_, mut sink)| sink.close())
-        .map_err(|_| ())
-        .map(|_| ());
+    let (publisher, subscriber1) = bounded(10);
+    let subscriber2 = subscriber1.clone();
 
-    rt.spawn(publisher);
+    block_on(async move {
+        stream::iter(1..15)
+            .map(|i| Ok(i))
+            .forward(publisher)
+            .await
+            .unwrap();
+    });
 
-    let received: Vec<i32> = rt.block_on(rx.map(|x| *x).collect()).unwrap();
+    let received1: Vec<u32> = block_on(async { subscriber1.map(|x| *x).collect().await });
+    let received2: Vec<u32> = block_on(async { subscriber2.map(|x| *x).collect().await });
     // Test that only the last 10 elements are in the received list.
-    let expected: Vec<i32> = (5..15).collect();
-    assert_eq!(expected, received);
+    let expected = (5..15).collect::<Vec<u32>>();
+    assert_eq!(received1, expected);
+    assert_eq!(received2, expected);
 }
