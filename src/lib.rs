@@ -49,7 +49,7 @@
 //! use bus_queue::raw_bounded;
 //!
 //! fn main() {
-//!     let (tx, rx) = raw_bounded(10, 0);
+//!     let (tx, rx) = raw_bounded(10);
 //!     (1..15).for_each(|x| { tx.broadcast(x).unwrap() });
 //!
 //!     let received: Vec<i32> = rx.map(|x| *x).collect();
@@ -66,7 +66,7 @@
 //! # use futures::StreamExt;
 //! # use futures::stream;
 //!
-//!    let (publisher, subscriber1) = bounded(10, 0);
+//!    let (publisher, subscriber1) = bounded(10);
 //!    let subscriber2 = subscriber1.clone();
 //!
 //!    block_on(async move {

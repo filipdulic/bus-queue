@@ -4,7 +4,7 @@ use futures::stream;
 use futures::StreamExt;
 
 fn main() {
-    let (publisher, subscriber1) = bounded(10, 0);
+    let (publisher, subscriber1) = bounded(10);
     let subscriber2 = subscriber1.clone();
 
     block_on(async move {

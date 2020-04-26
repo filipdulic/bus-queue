@@ -8,8 +8,8 @@ use futures::{
 use std::pin::Pin;
 use std::sync::Arc;
 
-pub fn bounded<T>(size: usize, missed_items_size: usize) -> (Publisher<T>, Subscriber<T>) {
-    let (sender, receiver) = raw_bounded(size, missed_items_size);
+pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
+    let (sender, receiver) = raw_bounded(size);
     let (waker, sleeper) = alarm();
     (
         Publisher { sender, waker },
@@ -67,6 +67,12 @@ impl<T> Eq for Publisher<T> {}
 pub struct Subscriber<T> {
     receiver: Receiver<T>,
     sleeper: Sleeper,
+}
+
+impl<T> Subscriber<T> {
+    pub fn set_missed_items_size(self, missed_items_size: usize) {
+        self.receiver.set_missed_items_size(missed_items_size);
+    }
 }
 
 impl<T> Stream for Subscriber<T> {
@@ -173,7 +179,7 @@ mod test {
 
     #[test]
     fn channel() {
-        let (publisher, subscriber1) = super::bounded(10, 0);
+        let (publisher, subscriber1) = super::bounded(10);
         let subscriber2 = subscriber1.clone();
 
         block_on(async move {
