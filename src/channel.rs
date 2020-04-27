@@ -124,13 +124,15 @@ impl<T> Receiver<T> {
 
         // Reader has not read enough to keep up with (writer - buffer size) so
         // set the reader pointer to be (writer - buffer size)
-        if self.wi.get() - self.ri.get() >= self.size {
-            self.ri
-                .set(self.wi.get() - self.size + self.missed_items_size);
+        loop {
+            let val = self.buffer[self.ri.get() % self.size].load_full().unwrap();
+            if self.wi.get() - self.ri.get() > self.size {
+                self.ri.set(self.wi.get() - self.size + self.skip_items);
+            } else {
+                self.ri.inc();
+                return Ok(val);
+            }
         }
-        let val = self.buffer[self.ri.get() % self.size].load_full().unwrap();
-        self.ri.inc();
-        return Ok(val);
     }
 }
 
