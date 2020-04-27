@@ -70,8 +70,8 @@ pub struct Subscriber<T> {
 }
 
 impl<T> Subscriber<T> {
-    pub fn set_missed_items_size(self, missed_items_size: usize) {
-        self.receiver.set_missed_items_size(missed_items_size);
+    pub fn set_skip_items(self, skip_items: usize) {
+        self.receiver.set_skip_items(skip_items);
     }
 }
 

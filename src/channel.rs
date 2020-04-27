@@ -31,7 +31,7 @@ pub fn bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
             ri: AtomicCounter::new(0),
             sub_count,
             is_sender_available,
-            missed_items_size: 0,
+            skip_items: 0,
         },
     )
 }
@@ -66,8 +66,8 @@ pub struct Receiver<T> {
     sub_count: Arc<AtomicCounter>,
     /// true if the sender is available
     is_sender_available: Arc<AtomicBool>,
-    /// how many items should the receiver miss when the writer overflows
-    missed_items_size: usize,
+    /// how many items should the receiver skip when the writer overflows
+    skip_items: usize,
 }
 
 impl<T> Sender<T> {
@@ -106,9 +106,9 @@ impl<T> Receiver<T> {
         self.is_sender_available.load(Ordering::Relaxed)
     }
 
-    /// Sets the missed_items_size attribute of the reader.
-    pub fn set_missed_items_size(mut self, missed_items_size: usize) {
-        self.missed_items_size = missed_items_size;
+    /// Sets the skip_items attribute of the reader to a max value being the queue size.
+    pub fn set_skip_items(mut self, skip_items: usize) {
+        self.skip_items = std::cmp::min(skip_items, self.size);
     }
 
     /// Receives some atomic reference to an object if queue is not empty, or None if it is. Never
@@ -145,7 +145,7 @@ impl<T> Clone for Receiver<T> {
             size: self.size,
             sub_count: Arc::clone(&self.sub_count),
             is_sender_available: self.is_sender_available.clone(),
-            missed_items_size: self.missed_items_size,
+            skip_items: self.skip_items,
         }
     }
 }
