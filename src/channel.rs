@@ -284,6 +284,8 @@ mod test {
         // Cloned receiver start reading where the original receiver left off
         let receiver2 = receiver.clone();
         assert_eq!(*receiver2.try_recv().unwrap(), 8);
+        assert_eq!(*receiver2.try_recv().unwrap(), 9);
+        assert_eq!(receiver2.try_recv(), Err(TryRecvError::Empty));
 
         sender.broadcast(10).unwrap();
 
