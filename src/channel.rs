@@ -337,4 +337,14 @@ mod test {
         // Receiver still expects the oldest value in buffer to be returned.
         assert_eq!(*receiver.try_recv().unwrap(), 1);
     }
+
+    #[test]
+    #[should_panic]
+    fn writer_overflows_pass_usize_max()
+    {
+        let (sender, _receiver) = bounded(3);
+        // set Sender wi index to usize::MAX
+        sender.wi.set(usize::MAX);
+        sender.broadcast(1).unwrap();
+    }
 }
