@@ -293,4 +293,19 @@ mod test {
         let values = receiver.into_iter().map(|v| *v).collect::<Vec<_>>();
         assert_eq!(values, (8..=10).collect::<Vec<i32>>());
     }
+
+    #[test]
+    fn read_before_writer_increments() {
+        let (sender, receiver) = bounded(3);
+        assert_eq!(sender.buffer.len(), 3);
+
+        for i in 0..3 {
+            sender.broadcast(i).unwrap();
+        }
+        assert_eq!(sender.wi.get(),3);
+        assert_eq!(receiver.ri.get(), 0);
+
+        sender.buffer[sender.wi.get() % sender.size].store(Some(Arc::new(3)));
+        assert_eq!(*receiver.try_recv().unwrap(), 0);
+    }
 }
