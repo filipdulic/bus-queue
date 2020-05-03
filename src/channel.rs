@@ -8,6 +8,7 @@ pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
 /// Function used to create and initialise a (Sender, Receiver) tuple.
 pub fn bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
+    let size = size + 1;
     let mut buffer = Vec::new();
     buffer.resize(size, ArcSwapOption::new(None));
     let buffer = Arc::new(buffer);
@@ -83,6 +84,11 @@ impl<T> Sender<T> {
         self.wi.inc();
         Ok(())
     }
+
+    /// Returns the length of the queue
+    pub fn len(&self) -> usize {
+        self.size - 1
+    }
 }
 
 /// Drop trait is used to let subscribers know that publisher is no longer available.
@@ -108,7 +114,7 @@ impl<T> Receiver<T> {
 
     /// Sets the skip_items attribute of the reader to a max value being the queue size.
     pub fn set_skip_items(mut self, skip_items: usize) {
-        self.skip_items = std::cmp::min(skip_items, self.size);
+        self.skip_items = std::cmp::min(skip_items, self.size - 1);
     }
 
     /// Receives some atomic reference to an object if queue is not empty, or None if it is. Never
@@ -125,14 +131,20 @@ impl<T> Receiver<T> {
         // Reader has not read enough to keep up with (writer - buffer size) so
         // set the reader pointer to be (writer - buffer size)
         loop {
-            let val = self.buffer[self.ri.get() % self.size].load_full().unwrap();
-            if self.wi.get() - self.ri.get() > self.size {
-                self.ri.set(self.wi.get() - self.size + self.skip_items);
+            let ri = self.ri.get();
+            let val = self.buffer[ri % self.size].load_full().unwrap();
+            if self.wi.get() >= ri + self.size {
+                self.ri.set(self.wi.get() - self.size + 1 + self.skip_items);
             } else {
                 self.ri.inc();
                 return Ok(val);
             }
         }
+    }
+
+    /// Returns the length of the queue
+    pub fn len(&self) -> usize {
+        self.size - 1
     }
 }
 
@@ -225,14 +237,14 @@ mod test {
     #[test]
     fn bounded_channel_size() {
         let (sender, receiver) = bounded::<()>(3);
-        assert_eq!(sender.buffer.len(), 3);
-        assert_eq!(receiver.buffer.len(), 3);
+        assert_eq!(sender.len(), 3);
+        assert_eq!(receiver.len(), 3);
     }
 
     #[test]
     fn bounded_within_size() {
         let (sender, receiver) = bounded(3);
-        assert_eq!(sender.buffer.len(), 3);
+        assert_eq!(sender.len(), 3);
 
         for i in 0..3 {
             sender.broadcast(i).unwrap();
@@ -245,7 +257,7 @@ mod test {
     #[test]
     fn bounded_overflow() {
         let (sender, receiver) = bounded(3);
-        assert_eq!(sender.buffer.len(), 3);
+        assert_eq!(sender.len(), 3);
 
         for i in 0..4 {
             sender.broadcast(i).unwrap();
@@ -258,7 +270,7 @@ mod test {
     #[test]
     fn bounded_overflow_with_reads() {
         let (sender, receiver) = bounded(3);
-        assert_eq!(sender.buffer.len(), 3);
+        assert_eq!(sender.len(), 3);
 
         for i in 0..3 {
             sender.broadcast(i).unwrap();
@@ -268,13 +280,14 @@ mod test {
         assert_eq!(*receiver.try_recv().unwrap(), 1);
 
         // "Cycle" buffer around twice
-        for i in 2..10 {
+        for i in 3..10 {
             sender.broadcast(i).unwrap();
         }
 
         // Should be reading from the last element in the buffer
+        let index = (receiver.wi.get() - receiver.size + 1) % receiver.size;
         assert_eq!(
-            *receiver.buffer[receiver.buffer.len() - 1]
+            *receiver.buffer[index]
                 .load_full()
                 .unwrap(),
             7
@@ -292,5 +305,36 @@ mod test {
         // Test reader has moved forward in the buffer
         let values = receiver.into_iter().map(|v| *v).collect::<Vec<_>>();
         assert_eq!(values, (8..=10).collect::<Vec<i32>>());
+    }
+
+    #[test]
+    fn read_before_writer_increments() {
+        let (sender, receiver) = bounded(3);
+        assert_eq!(sender.len(), 3);
+
+        for i in 0..3 {
+            sender.broadcast(i).unwrap();
+        }
+        assert_eq!(sender.wi.get(),3);
+        assert_eq!(receiver.ri.get(), 0);
+
+        // Inserts the value 3, but does not increment the index.
+        sender.buffer[sender.wi.get() % sender.size].store(Some(Arc::new(3)));
+        // Receiver still expects the oldest value in buffer to be returned.
+        assert_eq!(*receiver.try_recv().unwrap(), 0);
+        // reset receiver index
+        receiver.ri.set(0);
+
+        // sender index is incremented
+        sender.wi.inc();
+        assert_eq!(*receiver.try_recv().unwrap(), 1);
+
+        // reset receiver index
+        receiver.ri.set(0);
+
+        // Inserts the value 4, but does not increment the index.
+        sender.buffer[sender.wi.get() % sender.size].store(Some(Arc::new(4)));
+        // Receiver still expects the oldest value in buffer to be returned.
+        assert_eq!(*receiver.try_recv().unwrap(), 1);
     }
 }
