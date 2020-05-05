@@ -89,12 +89,17 @@ impl<T> Sender<T> {
     pub fn len(&self) -> usize {
         self.size - 1
     }
+
+    /// Closes the Sender
+    pub fn close(&self) {
+        self.is_available.store(false, Ordering::Relaxed);
+    }
 }
 
 /// Drop trait is used to let subscribers know that publisher is no longer available.
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.is_available.store(false, Ordering::Relaxed);
+        self.close();
     }
 }
 
@@ -344,7 +349,7 @@ mod test {
     {
         let (sender, _receiver) = bounded(3);
         // set Sender wi index to usize::MAX
-        sender.wi.set(usize::MAX);
+        sender.wi.set(usize::max_value());
         sender.broadcast(1).unwrap();
     }
 }

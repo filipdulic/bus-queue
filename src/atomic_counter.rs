@@ -21,7 +21,7 @@ impl AtomicCounter {
     }
     #[inline]
     pub fn inc(&self) {
-        if self.count.fetch_add(1, Ordering::AcqRel) == usize::MAX {
+        if self.count.fetch_add(1, Ordering::AcqRel) == usize::max_value() {
             panic!("usize overflow in AtomicCounter!");
         }
     }
