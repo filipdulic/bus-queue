@@ -173,28 +173,104 @@ pub fn alarm() -> (Waker, Sleeper) {
 
 #[cfg(test)]
 mod test {
-    use futures::executor::block_on;
-    use futures::stream::{self};
-    use futures::StreamExt;
+    use futures_test::{
+        assert_stream_pending, assert_stream_next, assert_stream_done,
+    };
+    use futures_test::task::noop_context;
+    use futures::pin_mut;
+    use futures::SinkExt;
+    use futures::task::Poll;
+    use std::sync::Arc;
+    use futures::future::FutureExt;
 
     #[test]
-    fn channel() {
-        let (publisher, subscriber1) = super::bounded(10);
-        let subscriber2 = subscriber1.clone();
+    fn subscriber_is_in_pending_state_before_first_data_is_published()
+    {
+        let (_publisher,  subscriber) = super::bounded::<usize>(1);
+        pin_mut!(subscriber);
 
-        block_on(async move {
-            stream::iter(1..15)
-                .map(|i| Ok(i))
-                .forward(publisher)
-                .await
-                .unwrap();
-        });
+        // Assert that subscriber stream is pending before the publisher publishes.
+        assert_stream_pending!(subscriber);
+    }
 
-        let received1: Vec<u32> = block_on(async { subscriber1.map(|x| *x).collect().await });
-        let received2: Vec<u32> = block_on(async { subscriber2.map(|x| *x).collect().await });
-        // Test that only the last 10 elements are in the received list.
-        let expected = (5..15).collect::<Vec<u32>>();
-        assert_eq!(received1, expected);
-        assert_eq!(received2, expected);
+    #[test]
+    fn subscriber_receives_an_item_after_it_is_published()
+    {
+        let mut cx = noop_context();
+        let (publisher,  subscriber) = super::bounded::<usize>(1);
+        pin_mut!(subscriber);
+        pin_mut!(publisher);
+
+        // Publish one item (1).
+        assert_eq!(publisher.send(1).poll_unpin(&mut cx), Poll::Ready(Ok(())));
+
+        // Assert that the subscriber can receive item (1).
+        assert_stream_next!(subscriber, Arc::new(1));
+    }
+    #[test]
+    fn subscriber_recieves_an_item_after_publisher_overflowed()
+    {
+        let mut cx = noop_context();
+        let (publisher,  subscriber) = super::bounded::<usize>(1);
+        pin_mut!(subscriber);
+        pin_mut!(publisher);
+
+        // Publish 1 item (1).
+        assert_eq!(publisher.send(1).poll_unpin(&mut cx), Poll::Ready(Ok(())));
+
+        // Assert that the publisher is not blocked even when overflowed
+        // by publishing another item (2) while queue size is 1
+        assert_eq!(publisher.send(2).poll_unpin(&mut cx), Poll::Ready(Ok(())));
+
+        // Assert that the subscriber receives the second item (2),
+        // since the first one (1) was dropped
+        assert_stream_next!(subscriber, Arc::new(2));
+    }
+    #[test]
+    fn subscriber_is_done_after_publisher_closes()
+    {
+        let mut cx = noop_context();
+        let (publisher,  subscriber) = super::bounded::<usize>(1);
+        pin_mut!(subscriber);
+        pin_mut!(publisher);
+
+        // Close Publisher.
+        assert_eq!(publisher.close().poll_unpin(&mut cx), Poll::Ready(Ok(())));
+
+        // Assert that the subscriber can receive item (1).
+        assert_stream_done!(subscriber);
+    }
+
+    #[test]
+    fn notify()
+    {
+        let (publisher,  subscriber) = super::bounded::<usize>(1);
+        pin_mut!(subscriber);
+        pin_mut!(publisher);
+
+        // Assert that subscriber stream is pending before the publisher publishes.
+        assert_stream_pending!(subscriber);
+
+        // Publish one item (1).
+        let mut cx = noop_context();
+        assert_eq!(publisher.send(1).poll_unpin(&mut cx), Poll::Ready(Ok(())));
+
+        // Assert that the subscriber can receive item (1).
+        assert_stream_next!(subscriber, Arc::new(1));
+
+        // Publish one more item  (2).
+        assert_eq!(publisher.send(2).poll_unpin(&mut cx), Poll::Ready(Ok(())));
+
+        // Assert that the subscriber can receive item (2).
+        assert_stream_next!(subscriber, Arc::new(2));
+
+        // Assert that the subscirber is pending of another item to be published.
+        assert_stream_pending!(subscriber);
+
+        // Close publisher.
+        assert_eq!(publisher.close().poll_unpin(&mut cx), Poll::Ready(Ok(())));
+
+        // Assert that subscriber is done.
+        assert_stream_done!(subscriber);
     }
 }
