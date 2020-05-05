@@ -14,6 +14,9 @@ arc-swap = "0.4.6"
 futures = "0.3.4"
 crossbeam-channel = "0.4.2"
 
+[dev-dependencies]
+futures-test = "0.3.4"
+
 [[example]]
 name = "raw-simple"
 path = "examples/raw-simple.rs"
