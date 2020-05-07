@@ -349,10 +349,10 @@ mod test {
         let (sender, receiver) = bounded(3);
         // set Sender wi index to usize::MAX - 3
         sender.wi.set(usize::max_value() - 3);
-        // fill buffer so that reader can read oldest value in buffer
-        sender.broadcast(1).unwrap();
-        sender.broadcast(2).unwrap();
-        sender.broadcast(3).unwrap();
+        // fill buffer so that reader can read oldest value in buffer (1,2,3)
+        for i in 1..4 {
+            sender.broadcast(i).unwrap();
+        }
         assert_eq!(*receiver.try_recv().unwrap(), 1);
         assert_eq!(*receiver.try_recv().unwrap(), 2);
 
@@ -361,9 +361,10 @@ mod test {
         // ri should be at usize::max_value() -1
         assert_eq!(receiver.ri.get(), usize::max_value() - 1);
 
-        // broadcast 2 more items so wi is at 1
-        sender.broadcast(4).unwrap();
-        sender.broadcast(5).unwrap();
+        // broadcast 2 more items (4,5) so wi is at 1
+        for i in 4..6 {
+            sender.broadcast(i).unwrap();
+        }
         assert_eq!(sender.wi.get(), 1);
         // receiver should be able to receive 3
         assert_eq!(*receiver.try_recv().unwrap(), 3);
@@ -376,10 +377,10 @@ mod test {
         let (sender, receiver) = bounded(3);
         // set Sender wi index to usize::MAX - 3
         sender.wi.set(usize::max_value() - 3);
-        // fill buffer so that reader can read oldest value in buffer
-        sender.broadcast(1).unwrap();
-        sender.broadcast(2).unwrap();
-        sender.broadcast(3).unwrap();
+        // fill buffer so that reader can read oldest value in buffer (1,2,3)
+        for i in 1..4 {
+            sender.broadcast(i).unwrap();
+        }
         assert_eq!(*receiver.try_recv().unwrap(), 1);
         assert_eq!(*receiver.try_recv().unwrap(), 2);
 
@@ -388,13 +389,10 @@ mod test {
         // ri should be at usize::max_value() -1
         assert_eq!(receiver.ri.get(), usize::max_value() - 1);
 
-        // broadcast 6 more items so wi is at 5
-        sender.broadcast(4).unwrap();
-        sender.broadcast(5).unwrap();
-        sender.broadcast(6).unwrap();
-        sender.broadcast(7).unwrap();
-        sender.broadcast(8).unwrap();
-        sender.broadcast(9).unwrap();
+        // broadcast 6 more items (4,5,6,7,8,9) so wi is at 5
+        for i in 4..10 {
+            sender.broadcast(i).unwrap();
+        }
         assert_eq!(sender.wi.get(), 5);
 
         // before calling try_recv() ri should be at usize::max_value() - 1
