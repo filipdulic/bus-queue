@@ -20,7 +20,9 @@ impl AtomicCounter {
         self.count.store(val, Ordering::Release);
     }
     #[inline]
-    pub fn inc(&self) { self.count.fetch_add(1, Ordering::AcqRel); }
+    pub fn inc(&self) {
+        self.count.fetch_add(1, Ordering::AcqRel);
+    }
     #[inline]
     pub fn dec(&self) {
         self.count.fetch_sub(1, Ordering::AcqRel);

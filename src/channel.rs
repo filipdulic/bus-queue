@@ -137,9 +137,15 @@ impl<T> Receiver<T> {
         // set the reader pointer to be (writer - buffer size)
         loop {
             let ri = self.ri.get();
+
             let val = self.buffer[ri % self.size].load_full().unwrap();
-            if self.wi.get() >= ri + self.size {
-                self.ri.set(self.wi.get() - self.size + 1 + self.skip_items);
+            if self.wi.get().wrapping_sub(ri) >= self.size {
+                self.ri.set(
+                    self.wi
+                        .get()
+                        .wrapping_sub(self.size)
+                        .wrapping_add(1 + self.skip_items),
+                );
             } else {
                 self.ri.inc();
                 return Ok(val);
