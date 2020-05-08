@@ -11,11 +11,12 @@ edition = "2018"
 
 [dependencies]
 arc-swap = "0.4.6"
-futures = "0.3.4"
+futures = {version = "0.3.5", features = ["thread-pool"]}
 piper = {git = "https://github.com/stjepang/piper.git"}
 
 [dev-dependencies]
-futures-test = "0.3.4"
+rand = "0.7.3"
+futures-test = "0.3.5"
 
 [[example]]
 name = "raw-simple"
