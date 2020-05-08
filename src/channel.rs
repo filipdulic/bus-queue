@@ -137,9 +137,15 @@ impl<T> Receiver<T> {
         // set the reader pointer to be (writer - buffer size)
         loop {
             let ri = self.ri.get();
+
             let val = self.buffer[ri % self.size].load_full().unwrap();
-            if self.wi.get() >= ri + self.size {
-                self.ri.set(self.wi.get() - self.size + 1 + self.skip_items);
+            if self.wi.get().wrapping_sub(ri) >= self.size {
+                self.ri.set(
+                    self.wi
+                        .get()
+                        .wrapping_sub(self.size)
+                        .wrapping_add(1 + self.skip_items),
+                );
             } else {
                 self.ri.inc();
                 return Ok(val);
@@ -339,11 +345,61 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
-    fn writer_overflows_pass_usize_max() {
-        let (sender, _receiver) = bounded(3);
-        // set Sender wi index to usize::MAX
-        sender.wi.set(usize::max_value());
-        sender.broadcast(1).unwrap();
+    fn writer_overflows_pass_usize_max_less_then_size() {
+        let (sender, receiver) = bounded(3);
+        // set Sender wi index to usize::MAX - 3
+        sender.wi.set(usize::max_value() - 3);
+        // fill buffer so that reader can read oldest value in buffer (1,2,3)
+        for i in 1..4 {
+            sender.broadcast(i).unwrap();
+        }
+        assert_eq!(*receiver.try_recv().unwrap(), 1);
+        assert_eq!(*receiver.try_recv().unwrap(), 2);
+
+        // wi should be at usize::max_value()
+        assert_eq!(sender.wi.get(), usize::max_value());
+        // ri should be at usize::max_value() -1
+        assert_eq!(receiver.ri.get(), usize::max_value() - 1);
+
+        // broadcast 2 more items (4,5) so wi is at 1
+        for i in 4..6 {
+            sender.broadcast(i).unwrap();
+        }
+        assert_eq!(sender.wi.get(), 1);
+        // receiver should be able to receive 3
+        assert_eq!(*receiver.try_recv().unwrap(), 3);
+        // ri should be at usize::max_value()
+        assert_eq!(receiver.ri.get(), usize::max_value());
+    }
+
+    #[test]
+    fn writer_overflows_pass_usize_max_more_then_size() {
+        let (sender, receiver) = bounded(3);
+        // set Sender wi index to usize::MAX - 3
+        sender.wi.set(usize::max_value() - 3);
+        // fill buffer so that reader can read oldest value in buffer (1,2,3)
+        for i in 1..4 {
+            sender.broadcast(i).unwrap();
+        }
+        assert_eq!(*receiver.try_recv().unwrap(), 1);
+        assert_eq!(*receiver.try_recv().unwrap(), 2);
+
+        // wi should be at usize::max_value()
+        assert_eq!(sender.wi.get(), usize::max_value());
+        // ri should be at usize::max_value() -1
+        assert_eq!(receiver.ri.get(), usize::max_value() - 1);
+
+        // broadcast 6 more items (4,5,6,7,8,9) so wi is at 5
+        for i in 4..10 {
+            sender.broadcast(i).unwrap();
+        }
+        assert_eq!(sender.wi.get(), 5);
+
+        // before calling try_recv() ri should be at usize::max_value() - 1
+        assert_eq!(receiver.ri.get(), usize::max_value() - 1);
+        // receiver should be able to receive 7
+        assert_eq!(*receiver.try_recv().unwrap(), 7);
+        // ri should be updated to 3
+        assert_eq!(receiver.ri.get(), 3);
     }
 }
