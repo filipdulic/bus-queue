@@ -89,12 +89,17 @@ impl<T> Sender<T> {
     pub fn len(&self) -> usize {
         self.size - 1
     }
+
+    /// Closes the Sender
+    pub fn close(&self) {
+        self.is_available.store(false, Ordering::Relaxed);
+    }
 }
 
 /// Drop trait is used to let subscribers know that publisher is no longer available.
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.is_available.store(false, Ordering::Relaxed);
+        self.close();
     }
 }
 
@@ -286,12 +291,7 @@ mod test {
 
         // Should be reading from the last element in the buffer
         let index = (receiver.wi.get() - receiver.size + 1) % receiver.size;
-        assert_eq!(
-            *receiver.buffer[index]
-                .load_full()
-                .unwrap(),
-            7
-        );
+        assert_eq!(*receiver.buffer[index].load_full().unwrap(), 7);
         assert_eq!(*receiver.try_recv().unwrap(), 7);
 
         // Cloned receiver start reading where the original receiver left off
@@ -315,7 +315,7 @@ mod test {
         for i in 0..3 {
             sender.broadcast(i).unwrap();
         }
-        assert_eq!(sender.wi.get(),3);
+        assert_eq!(sender.wi.get(), 3);
         assert_eq!(receiver.ri.get(), 0);
 
         // Inserts the value 3, but does not increment the index.
@@ -340,11 +340,10 @@ mod test {
 
     #[test]
     #[should_panic]
-    fn writer_overflows_pass_usize_max()
-    {
+    fn writer_overflows_pass_usize_max() {
         let (sender, _receiver) = bounded(3);
         // set Sender wi index to usize::MAX
-        sender.wi.set(usize::MAX);
+        sender.wi.set(usize::max_value());
         sender.broadcast(1).unwrap();
     }
 }
