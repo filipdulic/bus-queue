@@ -62,9 +62,7 @@
 //! ## Simple asynchronous usage
 //! ```rust
 //! # use bus_queue::bounded;
-//! # use futures::executor::block_on;
-//! # use futures::StreamExt;
-//! # use futures::stream;
+//! # use futures::{executor::block_on, StreamExt, stream};
 //!
 //!    let (publisher, subscriber1) = bounded(10);
 //!    let subscriber2 = subscriber1.clone();
@@ -98,8 +96,17 @@
 //! [`unwrap`]: ../../../std/result/enum.Result.html#method.unwrap
 
 pub(crate) mod atomic_counter;
-mod bus;
-mod channel;
+pub mod bus;
+pub mod channel;
+pub mod flavors;
+pub(crate) mod piper;
+pub mod swap_slot;
 
-pub use bus::{bounded, Publisher, Subscriber};
-pub use channel::bounded as raw_bounded;
+#[cfg(not(any(feature = "rwlock-export")))]
+pub use flavors::arc_swap::{bounded, raw_bounded, Publisher, Slot, Subscriber};
+
+#[cfg(feature = "rwlock-export")]
+pub use flavors::rw_lock::{bounded, raw_bounded, Publisher, Slot, Subscriber};
+
+// #[cfg(feature = "conc-atomic")]
+// pub use flavors::conc_atomic::{bounded, raw_bounded, Publisher, Subscriber};

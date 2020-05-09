@@ -1,77 +1,54 @@
 use crate::atomic_counter::AtomicCounter;
-use arc_swap::ArcSwapOption;
-use std::iter::Iterator;
 use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
 // Use std mpsc's error types as our own
+use crate::swap_slot::SwapSlot;
 use std::fmt::Debug;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
+pub mod receiver;
+pub mod sender;
+
+pub use receiver::Receiver;
+pub use sender::Sender;
+
 /// Function used to create and initialise a (Sender, Receiver) tuple.
-pub fn bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
+pub fn bounded<T, S: SwapSlot<T>>(size: usize) -> (Sender<T, S>, Receiver<T, S>) {
     let size = size + 1;
-    let mut buffer = Vec::new();
-    buffer.resize(size, ArcSwapOption::new(None));
-    let buffer = Arc::new(buffer);
-    let wi = Arc::new(AtomicCounter::new(0));
-
-    let sub_count = Arc::new(AtomicCounter::new(1));
-    let is_sender_available = Arc::new(AtomicBool::new(true));
-
+    let mut buffer = Vec::with_capacity(size);
+    for _i in 0..size {
+        buffer.push(S::none())
+    }
+    let channel: Channel<T, S> = Channel {
+        buffer,
+        size,
+        wi: AtomicCounter::new(0),
+        sub_count: AtomicCounter::new(1),
+        is_available: AtomicBool::new(true),
+        ph: std::marker::PhantomData,
+    };
+    let arc_channel = Arc::new(channel);
     (
-        Sender {
-            buffer: buffer.clone(),
-            size,
-            wi: wi.clone(),
-            sub_count: sub_count.clone(),
-            is_available: is_sender_available.clone(),
-        },
-        Receiver {
-            buffer,
-            size,
-            wi,
-            ri: AtomicCounter::new(0),
-            sub_count,
-            is_sender_available,
-            skip_items: 0,
-        },
+        Sender::from(arc_channel.clone()),
+        Receiver::from(arc_channel),
     )
 }
 
-/// Bare implementation of the publisher.
 #[derive(Debug)]
-pub struct Sender<T> {
-    /// Shared reference to the circular buffer
-    buffer: Arc<Vec<ArcSwapOption<T>>>,
+pub struct Channel<T, S: SwapSlot<T>> {
+    /// Circular buffer
+    buffer: Vec<S>,
     /// Size of the buffer
     size: usize,
     /// Write index pointer
-    wi: Arc<AtomicCounter>,
+    wi: AtomicCounter,
     /// Number of subscribers
-    sub_count: Arc<AtomicCounter>,
+    sub_count: AtomicCounter,
     /// true if this sender is still available
-    is_available: Arc<AtomicBool>,
+    is_available: AtomicBool,
+    ph: std::marker::PhantomData<T>,
 }
 
-/// Bare implementation of the subscriber.
-#[derive(Debug)]
-pub struct Receiver<T> {
-    /// Shared reference to the circular buffer
-    buffer: Arc<Vec<ArcSwapOption<T>>>,
-    /// Write index pointer
-    wi: Arc<AtomicCounter>,
-    /// Read index pointer
-    ri: AtomicCounter,
-    /// This size of the buffer
-    size: usize,
-    /// Number of subscribers
-    sub_count: Arc<AtomicCounter>,
-    /// true if the sender is available
-    is_sender_available: Arc<AtomicBool>,
-    /// how many items should the receiver skip when the writer overflows
-    skip_items: usize,
-}
-
-impl<T> Sender<T> {
+impl<T, S: SwapSlot<T>> Channel<T, S> {
     /// Publishes values to the circular buffer at wi % size
     ///
     /// # Arguments
@@ -80,53 +57,16 @@ impl<T> Sender<T> {
         if self.sub_count.get() == 0 {
             return Err(SendError(object));
         }
-        self.buffer[self.wi.get() % self.size].store(Some(Arc::new(object)));
+        self.buffer[self.wi.get() % self.size].store(object);
         self.wi.inc();
         Ok(())
     }
 
-    /// Returns the length of the queue
-    pub fn len(&self) -> usize {
-        self.size - 1
-    }
-
-    /// Closes the Sender
-    pub fn close(&self) {
-        self.is_available.store(false, Ordering::Relaxed);
-    }
-}
-
-/// Drop trait is used to let subscribers know that publisher is no longer available.
-impl<T> Drop for Sender<T> {
-    fn drop(&mut self) {
-        self.close();
-    }
-}
-
-impl<T> PartialEq for Sender<T> {
-    fn eq(&self, other: &Sender<T>) -> bool {
-        Arc::ptr_eq(&self.buffer, &other.buffer)
-    }
-}
-
-impl<T> Eq for Sender<T> {}
-
-impl<T> Receiver<T> {
-    /// Returns true if the sender is available, otherwise false
-    fn is_sender_available(&self) -> bool {
-        self.is_sender_available.load(Ordering::Relaxed)
-    }
-
-    /// Sets the skip_items attribute of the reader to a max value being the queue size.
-    pub fn set_skip_items(mut self, skip_items: usize) {
-        self.skip_items = std::cmp::min(skip_items, self.size - 1);
-    }
-
     /// Receives some atomic reference to an object if queue is not empty, or None if it is. Never
     /// Blocks
-    pub fn try_recv(&self) -> Result<Arc<T>, TryRecvError> {
-        if self.ri.get() == self.wi.get() {
-            if self.is_sender_available() {
+    pub fn try_recv(&self, ri: &AtomicCounter, skip_items: usize) -> Result<Arc<T>, TryRecvError> {
+        if ri.get() == self.wi.get() {
+            if self.is_available() {
                 return Err(TryRecvError::Empty);
             } else {
                 return Err(TryRecvError::Disconnected);
@@ -136,94 +76,82 @@ impl<T> Receiver<T> {
         // Reader has not read enough to keep up with (writer - buffer size) so
         // set the reader pointer to be (writer - buffer size)
         loop {
-            let ri = self.ri.get();
+            let local_ri = ri.get();
 
-            let val = self.buffer[ri % self.size].load_full().unwrap();
-            if self.wi.get().wrapping_sub(ri) >= self.size {
-                self.ri.set(
+            let val = self.buffer[local_ri % self.size].load();
+            if self.wi.get().wrapping_sub(local_ri) >= self.size {
+                ri.set(
                     self.wi
                         .get()
                         .wrapping_sub(self.size)
-                        .wrapping_add(1 + self.skip_items),
+                        .wrapping_add(1 + skip_items),
                 );
             } else {
-                self.ri.inc();
+                ri.inc();
                 return Ok(val);
             }
         }
+    }
+
+    /// Closes the channel
+    pub fn close(&self) {
+        self.is_available.store(false, Ordering::Relaxed);
+    }
+    /// Returns true if the sender is available, otherwise false
+    fn is_available(&self) -> bool {
+        self.is_available.load(Ordering::Relaxed)
     }
 
     /// Returns the length of the queue
     pub fn len(&self) -> usize {
         self.size - 1
     }
-}
 
-/// Clone trait is used to create a Receiver which receives messages from the same Sender
-impl<T> Clone for Receiver<T> {
-    fn clone(&self) -> Self {
-        self.sub_count.inc();
-        Self {
-            buffer: self.buffer.clone(),
-            wi: self.wi.clone(),
-            ri: AtomicCounter::new(self.ri.get()),
-            size: self.size,
-            sub_count: Arc::clone(&self.sub_count),
-            is_sender_available: self.is_sender_available.clone(),
-            skip_items: self.skip_items,
-        }
+    /// Checks if nothings has been published yet
+    pub fn is_empty(&self) -> bool {
+        self.wi.get() == 0
     }
-}
 
-impl<T> Drop for Receiver<T> {
-    fn drop(&mut self) {
+    /// Increment the number of subs
+    pub fn inc_sub_count(&self) {
+        self.sub_count.inc();
+    }
+
+    /// Decrement the number of subs
+    pub fn dec_sub_count(&self) {
         self.sub_count.dec();
     }
 }
 
-impl<T> PartialEq for Receiver<T> {
-    fn eq(&self, other: &Receiver<T>) -> bool {
-        Arc::ptr_eq(&self.buffer, &other.buffer) && self.ri == other.ri
-    }
-}
-
-impl<T> Eq for Receiver<T> {}
-
-impl<T> Iterator for Receiver<T> {
-    type Item = Arc<T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.try_recv().ok()
+/// Drop trait is used to let subscribers know that publisher is no longer available.
+impl<T, S: SwapSlot<T>> Drop for Channel<T, S> {
+    fn drop(&mut self) {
+        self.close();
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::SwapSlot;
+    use crate::channel::TryRecvError;
+    use crate::raw_bounded as bounded;
 
     #[test]
     fn subcount() {
         let (sender, receiver) = bounded::<()>(1);
         let receiver2 = receiver.clone();
-        assert_eq!(sender.sub_count.get(), 2);
-        assert_eq!(receiver.sub_count.get(), 2);
-        assert_eq!(receiver2.sub_count.get(), 2);
+        assert_eq!(sender.channel.sub_count.get(), 2);
+        assert_eq!(receiver.channel.sub_count.get(), 2);
+        assert_eq!(receiver2.channel.sub_count.get(), 2);
         drop(receiver2);
 
-        assert_eq!(sender.sub_count.get(), 1);
-        assert_eq!(receiver.sub_count.get(), 1);
-    }
-
-    #[test]
-    fn eq() {
-        let (_sender, receiver) = bounded::<()>(1);
-        let receiver2 = receiver.clone();
-        assert_eq!(receiver, receiver2);
+        assert_eq!(sender.channel.sub_count.get(), 1);
+        assert_eq!(receiver.channel.sub_count.get(), 1);
     }
 
     #[test]
     fn bounded_channel() {
-        let (sender, receiver) = bounded(1);
+        let (sender, receiver) = bounded::<i32>(1);
         let receiver2 = receiver.clone();
         sender.broadcast(123).unwrap();
         assert_eq!(*receiver.try_recv().unwrap(), 123);
@@ -296,8 +224,9 @@ mod test {
         }
 
         // Should be reading from the last element in the buffer
-        let index = (receiver.wi.get() - receiver.size + 1) % receiver.size;
-        assert_eq!(*receiver.buffer[index].load_full().unwrap(), 7);
+        let index = (receiver.channel.wi.get() - receiver.channel.size + 1) % receiver.channel.size;
+
+        assert_eq!(*SwapSlot::load(&receiver.channel.buffer[index]), 7);
         assert_eq!(*receiver.try_recv().unwrap(), 7);
 
         // Cloned receiver start reading where the original receiver left off
@@ -321,25 +250,31 @@ mod test {
         for i in 0..3 {
             sender.broadcast(i).unwrap();
         }
-        assert_eq!(sender.wi.get(), 3);
+        assert_eq!(sender.channel.wi.get(), 3);
         assert_eq!(receiver.ri.get(), 0);
 
         // Inserts the value 3, but does not increment the index.
-        sender.buffer[sender.wi.get() % sender.size].store(Some(Arc::new(3)));
+        SwapSlot::store(
+            &sender.channel.buffer[sender.channel.wi.get() % sender.channel.size],
+            3,
+        );
         // Receiver still expects the oldest value in buffer to be returned.
         assert_eq!(*receiver.try_recv().unwrap(), 0);
         // reset receiver index
         receiver.ri.set(0);
 
         // sender index is incremented
-        sender.wi.inc();
+        sender.channel.wi.inc();
         assert_eq!(*receiver.try_recv().unwrap(), 1);
 
         // reset receiver index
         receiver.ri.set(0);
 
         // Inserts the value 4, but does not increment the index.
-        sender.buffer[sender.wi.get() % sender.size].store(Some(Arc::new(4)));
+        SwapSlot::store(
+            &sender.channel.buffer[sender.channel.wi.get() % sender.channel.size],
+            4,
+        );
         // Receiver still expects the oldest value in buffer to be returned.
         assert_eq!(*receiver.try_recv().unwrap(), 1);
     }
@@ -348,7 +283,7 @@ mod test {
     fn writer_overflows_pass_usize_max_less_then_size() {
         let (sender, receiver) = bounded(3);
         // set Sender wi index to usize::MAX - 3
-        sender.wi.set(usize::max_value() - 3);
+        sender.channel.wi.set(usize::max_value() - 3);
         // fill buffer so that reader can read oldest value in buffer (1,2,3)
         for i in 1..4 {
             sender.broadcast(i).unwrap();
@@ -357,7 +292,7 @@ mod test {
         assert_eq!(*receiver.try_recv().unwrap(), 2);
 
         // wi should be at usize::max_value()
-        assert_eq!(sender.wi.get(), usize::max_value());
+        assert_eq!(sender.channel.wi.get(), usize::max_value());
         // ri should be at usize::max_value() -1
         assert_eq!(receiver.ri.get(), usize::max_value() - 1);
 
@@ -365,7 +300,7 @@ mod test {
         for i in 4..6 {
             sender.broadcast(i).unwrap();
         }
-        assert_eq!(sender.wi.get(), 1);
+        assert_eq!(sender.channel.wi.get(), 1);
         // receiver should be able to receive 3
         assert_eq!(*receiver.try_recv().unwrap(), 3);
         // ri should be at usize::max_value()
@@ -376,7 +311,7 @@ mod test {
     fn writer_overflows_pass_usize_max_more_then_size() {
         let (sender, receiver) = bounded(3);
         // set Sender wi index to usize::MAX - 3
-        sender.wi.set(usize::max_value() - 3);
+        sender.channel.wi.set(usize::max_value() - 3);
         // fill buffer so that reader can read oldest value in buffer (1,2,3)
         for i in 1..4 {
             sender.broadcast(i).unwrap();
@@ -385,7 +320,7 @@ mod test {
         assert_eq!(*receiver.try_recv().unwrap(), 2);
 
         // wi should be at usize::max_value()
-        assert_eq!(sender.wi.get(), usize::max_value());
+        assert_eq!(sender.channel.wi.get(), usize::max_value());
         // ri should be at usize::max_value() -1
         assert_eq!(receiver.ri.get(), usize::max_value() - 1);
 
@@ -393,7 +328,7 @@ mod test {
         for i in 4..10 {
             sender.broadcast(i).unwrap();
         }
-        assert_eq!(sender.wi.get(), 5);
+        assert_eq!(sender.channel.wi.get(), 5);
 
         // before calling try_recv() ri should be at usize::max_value() - 1
         assert_eq!(receiver.ri.get(), usize::max_value() - 1);
@@ -401,5 +336,85 @@ mod test {
         assert_eq!(*receiver.try_recv().unwrap(), 7);
         // ri should be updated to 3
         assert_eq!(receiver.ri.get(), 3);
+    }
+
+    #[test]
+    fn test_arc() {
+        use std::sync::Arc;
+        // make a sender with 2 receiver clones
+        let (sender, receiver) = bounded(1);
+        let receiver2 = receiver.clone();
+
+        // Broadcast an item.
+        // It is stored through an Arc inside the buffer
+        // it's reference count is 1.
+        sender.broadcast(1).unwrap();
+
+        // Pick up the item through one receiver
+        let arc1 = receiver.try_recv().unwrap();
+        assert_eq!(*arc1, 1);
+        // it's reference count jumps to 2.
+        assert_eq!(Arc::strong_count(&arc1), 2);
+
+        // Pick up the same item through the second receiver
+        let arc2 = receiver2.try_recv().unwrap();
+        // it's reference count jumps to 3.
+        assert_eq!(Arc::strong_count(&arc2), 3);
+        // the first received Arc ref count also jumps to 3.
+        assert_eq!(Arc::strong_count(&arc1), 3);
+
+        // Broadcast another item.
+        // Since the internal buffer is actually bigger by 1 then the size
+        // parameter sent the the bounded function, the item we published first
+        // is still inside the buffer and it's reference counts is unchanged.
+        sender.broadcast(2).unwrap();
+        assert_eq!(Arc::strong_count(&arc1), 3);
+        assert_eq!(Arc::strong_count(&arc2), 3);
+
+        // By broadcasting another item, we have overwritten the first item
+        // in the buffer and it's ref should drop by one.
+        sender.broadcast(3).unwrap();
+        assert_eq!(Arc::strong_count(&arc1), 2);
+        assert_eq!(Arc::strong_count(&arc2), 2);
+    }
+
+    #[test]
+    fn test_is_empty() {
+        let (sender, receiver) = bounded(1);
+        assert!(sender.is_empty());
+        assert!(receiver.is_empty());
+        assert!(sender.channel.is_empty());
+        sender.broadcast(1).unwrap();
+        assert!(!sender.is_empty());
+        assert!(!receiver.is_empty());
+        assert!(!sender.channel.is_empty());
+    }
+
+    #[test]
+    fn test_sender_eq() {
+        let (sender1, _) = bounded::<i32>(1);
+        let (sender2, _) = bounded::<i32>(1);
+        assert!(!sender1.eq(&sender2));
+        assert!(sender1.eq(&sender1));
+        assert!(sender2.eq(&sender2));
+    }
+
+    #[test]
+    fn test_set_skip_items() {
+        let (sender, receiver1) = bounded(3);
+        let mut receiver2 = receiver1.clone();
+        let mut receiver3 = receiver1.clone();
+        let mut receiver4 = receiver1.clone();
+        receiver2.set_skip_items(1);
+        receiver3.set_skip_items(2);
+        receiver4.set_skip_items(3);
+
+        for i in 0..6 {
+            sender.broadcast(i).unwrap();
+        }
+        assert_eq!(*receiver1.try_recv().unwrap(), 3);
+        assert_eq!(*receiver2.try_recv().unwrap(), 4);
+        assert_eq!(*receiver3.try_recv().unwrap(), 5);
+        assert_eq!(*receiver4.try_recv().unwrap(), 5);
     }
 }
