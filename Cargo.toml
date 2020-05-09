@@ -1,6 +1,6 @@
 [package]
 name = "bus_queue"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Filip Dulic <filip.dulic@gmail.com>", "Vladan Popovic <vladanovic@gmail.com>", "Bojan Petrovic <bojan_petrovic@fastmail.fm>"]
 description = "Lock-free Bounded non-Blocking Pub-Sub Queue"
 license = "Apache-2.0/MIT"
@@ -11,12 +11,13 @@ edition = "2018"
 
 [dependencies]
 arc-swap = "0.4.6"
-futures = {version = "0.3.5", features = ["thread-pool"]}
+futures = "0.3.5"
 piper = {git = "https://github.com/stjepang/piper.git"}
 
 [dev-dependencies]
 rand = "0.7.3"
 futures-test = "0.3.5"
+futures = {version = "0.3.5", features = ["thread-pool"]}
 
 [[example]]
 name = "raw-simple"
