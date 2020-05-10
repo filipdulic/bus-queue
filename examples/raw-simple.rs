@@ -1,5 +1,3 @@
-extern crate bus_queue;
-
 use bus_queue::raw_bounded;
 
 fn main() {

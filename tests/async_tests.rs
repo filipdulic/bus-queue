@@ -1,5 +1,6 @@
 use bus_queue::bounded;
-use futures::{executor, stream::StreamExt, task::SpawnExt, SinkExt};
+use futures::executor;
+use futures::{task::SpawnExt, SinkExt, StreamExt};
 use rand::Rng;
 use std::time::Duration;
 

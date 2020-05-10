@@ -35,10 +35,16 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Run cargo test
+      - name: Run cargo test default
         uses: actions-rs/cargo@v1
         with:
           command: test
+
+      - name: Run cargo test rwlock
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          arg: --no-default-features --features=rwlock,rwlock-export
 
   lints:
     name: Lints
@@ -61,8 +67,13 @@ jobs:
           command: fmt
           args: --all -- --check
 
-      - name: Run cargo clippy
+      - name: Run cargo clippy default
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+
+      - name: Run cargo clippy rwlock
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --no-default-features --features=rwlock,rwlock-export
