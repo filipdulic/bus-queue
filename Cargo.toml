@@ -30,9 +30,6 @@ rwlock-export = []
 atomic-arc = []
 atomic-arc-export = []
 
-
-
-
 [[example]]
 name = "raw-simple"
 path = "examples/raw-simple.rs"
