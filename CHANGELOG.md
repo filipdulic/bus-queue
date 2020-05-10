@@ -1,5 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
+## 0.5.3 - 2020-05-10
+### Added
+- [Issue #36](https://github.com/filipdulic/bus-queue/issues/36) - [Pull Request #45](https://github.com/filipdulic/bus-queue/pull/45) - Refactor Senders and Reciever to use an internal Channel which
+                                                                                                                                         provides most of the logic.
+- [Issue #44](https://github.com/filipdulic/bus-queue/issues/44) - [Pull Request #45](https://github.com/filipdulic/bus-queue/pull/45)  - Add SwapSlot Trait.
+- [Issue #38](https://github.com/filipdulic/bus-queue/issues/38) - [Pull Request #45](https://github.com/filipdulic/bus-queue/pull/45) - Add RwLock flavor.
+- [Pull Request #45](https://github.com/filipdulic/bus-queue/pull/45) - Refactor folder structure to have individual files for Channel,
+                                                                        Sender, Reciever, Publisher and Subscriber.
+- [Pull Request #45](https://github.com/filipdulic/bus-queue/pull/45) - Integrate Channel with flavors using the SwapSlot Trait.
+- [Pull Request #45](https://github.com/filipdulic/bus-queue/pull/45) - Copy [piper::Event](https://github.com/stjepang/piper) into the project until event is exposed on
+                                                                        crates.io by its author.
+- [Pull Request #45](https://github.com/filipdulic/bus-queue/pull/45) - Add Tarapaulin github workflow.
+- [Pull Request #45](https://github.com/filipdulic/bus-queue/pull/45) - Code coverage increased to over 90%.
 ## 0.5.2 - 2020-05-09
 ### Fixed
 - [Issue #29](https://github.com/filipdulic/bus-queue/issues/28) - [Pull Request #35](https://github.com/filipdulic/bus-queue/pull/35) - Index overflow not handled.

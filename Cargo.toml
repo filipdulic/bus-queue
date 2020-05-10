@@ -1,6 +1,6 @@
 [package]
 name = "bus_queue"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Filip Dulic <filip.dulic@gmail.com>", "Vladan Popovic <vladanovic@gmail.com>", "Bojan Petrovic <bojan_petrovic@fastmail.fm>"]
 description = "Lock-free Bounded non-Blocking Pub-Sub Queue"
 license = "Apache-2.0/MIT"
