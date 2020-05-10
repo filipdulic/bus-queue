@@ -27,6 +27,8 @@ arcswap = ["arc-swap"]
 # conc-atomic = ["conc"]
 rwlock = []
 rwlock-export = []
+atomic-arc = []
+atomic-arc-export = []
 
 
 

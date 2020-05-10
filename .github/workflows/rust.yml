@@ -46,6 +46,12 @@ jobs:
           command: test
           arg: --no-default-features --features=rwlock,rwlock-export
 
+      - name: Run cargo test atomic-arc
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          arg: --no-default-features --features=atomic-arc,atomic-arc-export
+
   lints:
     name: Lints
     runs-on: ubuntu-latest
@@ -77,3 +83,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --no-default-features --features=rwlock,rwlock-export
+
+      - name: Run cargo clippy atomic-arc
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --no-default-features --features=atomic-arc,atomic-arc-export
