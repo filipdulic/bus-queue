@@ -20,6 +20,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
+          args: --all-features
 
   test:
     name: Test Suite
@@ -35,22 +36,11 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Run cargo test default
+      - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
-
-      - name: Run cargo test rwlock
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          arg: --no-default-features --features=rwlock,rwlock-export
-
-      - name: Run cargo test atomic-arc
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          arg: --no-default-features --features=atomic-arc,atomic-arc-export
+          arg: --all-features
 
   lints:
     name: Lints
@@ -73,19 +63,8 @@ jobs:
           command: fmt
           args: --all -- --check
 
-      - name: Run cargo clippy default
+      - name: Run cargo clippy
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run cargo clippy rwlock
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --no-default-features --features=rwlock,rwlock-export
-
-      - name: Run cargo clippy atomic-arc
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --no-default-features --features=atomic-arc,atomic-arc-export
+          args: --all-features
