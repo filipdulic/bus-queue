@@ -4,8 +4,8 @@ use crate::swap_slot::SwapSlot;
 // use piper::Event;
 use std::sync::Arc;
 
-pub mod publisher;
-pub mod subscriber;
+mod publisher;
+mod subscriber;
 
 pub use publisher::Publisher;
 pub use subscriber::Subscriber;

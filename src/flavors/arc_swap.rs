@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::bus;
 use crate::channel;
 use crate::swap_slot::SwapSlot;

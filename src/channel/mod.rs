@@ -5,8 +5,8 @@ use crate::swap_slot::SwapSlot;
 use std::fmt::Debug;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
-pub mod receiver;
-pub mod sender;
+mod receiver;
+mod sender;
 
 pub use receiver::Receiver;
 pub use sender::Sender;
