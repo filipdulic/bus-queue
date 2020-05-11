@@ -39,23 +39,20 @@ instigating a propagation of failure among threads if one unexpectedly dies.
 
 # Examples
 
-## Simple bare usage
+## Simple raw usage
 
 ```rust
 extern crate bus_queue;
-
 use bus_queue::raw_bounded;
 
-fn main() {
-    let (tx, rx) = raw_bounded(10);
-    (1..15).for_each(|x| tx.broadcast(x).unwrap());
+let (tx, rx) = raw_bounded(10);
+(1..15).for_each(|x| tx.broadcast(x).unwrap());
 
-    let received: Vec<i32> = rx.map(|x| *x).collect();
-    // Test that only the last 10 elements are in the received list.
-    let expected: Vec<i32> = (5..15).collect();
+let received: Vec<i32> = rx.map(|x| *x).collect();
+// Test that only the last 10 elements are in the received list.
+let expected: Vec<i32> = (5..15).collect();
 
-    assert_eq!(expected, received);
-}
+assert_eq!(expected, received);
 ```
 
 ## Simple async usage
@@ -66,23 +63,21 @@ use futures::executor::block_on;
 use futures::stream;
 use futures::StreamExt;
 
-fn main() {
-    let (publisher, subscriber1) = bounded(10);
-    let subscriber2 = subscriber1.clone();
+let (publisher, subscriber1) = bounded(10);
+let subscriber2 = subscriber1.clone();
 
-    block_on(async move {
-        stream::iter(1..15)
-            .map(|i| Ok(i))
-            .forward(publisher)
-            .await
-            .unwrap();
-    });
+block_on(async move {
+    stream::iter(1..15)
+        .map(|i| Ok(i))
+        .forward(publisher)
+        .await
+        .unwrap();
+});
 
-    let received1: Vec<u32> = block_on(async { subscriber1.map(|x| *x).collect().await });
-    let received2: Vec<u32> = block_on(async { subscriber2.map(|x| *x).collect().await });
-    // Test that only the last 10 elements are in the received list.
-    let expected = (5..15).collect::<Vec<u32>>();
-    assert_eq!(received1, expected);
-    assert_eq!(received2, expected);
-}
+let received1: Vec<u32> = block_on(async { subscriber1.map(|x| *x).collect().await });
+let received2: Vec<u32> = block_on(async { subscriber2.map(|x| *x).collect().await });
+// Test that only the last 10 elements are in the received list.
+let expected = (5..15).collect::<Vec<u32>>();
+assert_eq!(received1, expected);
+assert_eq!(received2, expected);
 ```

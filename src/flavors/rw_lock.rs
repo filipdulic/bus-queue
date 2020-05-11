@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::swap_slot::SwapSlot;
 use crate::{bus, channel};
 use std::sync::{Arc, RwLock};

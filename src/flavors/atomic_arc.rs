@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::atomic::atomic_arc::AtomicArc;
 use crate::bus;
 use crate::channel;
