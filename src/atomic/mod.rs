@@ -3,4 +3,6 @@
 //! It will only be temporarily used until the project is published by the
 //! original author on crates.io or until the author asks for it's removal.
 #[cfg_attr(tarpaulin, skip)]
-pub(crate) mod event;
+pub mod atomic_arc;
+#[cfg_attr(tarpaulin, skip)]
+mod hazard;

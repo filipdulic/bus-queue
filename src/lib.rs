@@ -102,11 +102,17 @@ pub mod flavors;
 pub(crate) mod piper;
 pub mod swap_slot;
 
-#[cfg(not(any(feature = "rwlock-export")))]
+#[cfg(feature = "atomic-arc")]
+mod atomic;
+
+#[cfg(not(any(feature = "rwlock-export", feature = "atomic-arc-export")))]
 pub use flavors::arc_swap::{bounded, raw_bounded, Publisher, Slot, Subscriber};
 
 #[cfg(feature = "rwlock-export")]
 pub use flavors::rw_lock::{bounded, raw_bounded, Publisher, Slot, Subscriber};
+
+#[cfg(feature = "atomic-arc-export")]
+pub use flavors::atomic_arc::{bounded, raw_bounded, Publisher, Slot, Subscriber};
 
 // #[cfg(feature = "conc-atomic")]
 // pub use flavors::conc_atomic::{bounded, raw_bounded, Publisher, Subscriber};
