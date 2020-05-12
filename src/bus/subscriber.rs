@@ -37,6 +37,16 @@ impl<T, S: SwapSlot<T>> Subscriber<T, S> {
     pub fn set_skip_items(&mut self, skip_items: usize) {
         self.receiver.set_skip_items(skip_items);
     }
+
+    /// Returns the number of remaining in the stream.
+    pub fn len(&self) -> usize {
+        self.receiver.len()
+    }
+
+    /// Checks if stream is empty.
+    pub fn is_empty(&self) -> bool {
+        self.receiver.is_empty()
+    }
 }
 
 impl<T, S: SwapSlot<T>> Stream for Subscriber<T, S> {
