@@ -42,14 +42,14 @@ impl<T, S: SwapSlot<T>> Receiver<T, S> {
         self.channel.try_recv(&self.ri, self.skip_items)
     }
 
-    /// Returns the length of the queue
+    /// Returns the length of the queue.
     pub fn len(&self) -> usize {
         self.channel.len()
     }
 
-    /// Checks if nothings has been published yet
+    /// Checks if nothings has been published yet.
     pub fn is_empty(&self) -> bool {
-        self.channel.wi.get() == 0
+        self.channel.wi.get() == self.ri.get()
     }
 }
 
