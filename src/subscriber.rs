@@ -4,7 +4,7 @@ use crate::swap_slot::SwapSlot;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct Subscriber<T, S: SwapSlot<T>> {
+pub struct GenericSubscriber<T, S: SwapSlot<T>> {
     /// Shared reference to the channel
     pub(super) channel: Arc<RingBuffer<T, S>>,
     /// Read index pointer
@@ -13,7 +13,7 @@ pub struct Subscriber<T, S: SwapSlot<T>> {
     pub(super) skip_items: usize,
 }
 
-impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for GenericSubscriber<T, S> {
     fn from(arc_channel: Arc<RingBuffer<T, S>>) -> Self {
         Self {
             channel: arc_channel,
@@ -23,7 +23,7 @@ impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for Subscriber<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> GenericSubscriber<T, S> {
     /// Returns true if the sender is available, otherwise false
     #[allow(dead_code)]
     pub fn is_sender_available(&self) -> bool {
@@ -54,7 +54,7 @@ impl<T, S: SwapSlot<T>> Subscriber<T, S> {
 }
 
 /// Clone trait is used to create a Receiver which receives messages from the same Sender
-impl<T, S: SwapSlot<T>> Clone for Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> Clone for GenericSubscriber<T, S> {
     fn clone(&self) -> Self {
         self.channel.inc_sub_count();
         Self {
@@ -65,21 +65,21 @@ impl<T, S: SwapSlot<T>> Clone for Subscriber<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> Drop for Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> Drop for GenericSubscriber<T, S> {
     fn drop(&mut self) {
         self.channel.dec_sub_count();
     }
 }
 
-impl<T, S: SwapSlot<T>> PartialEq for Subscriber<T, S> {
-    fn eq(&self, other: &Subscriber<T, S>) -> bool {
+impl<T, S: SwapSlot<T>> PartialEq for GenericSubscriber<T, S> {
+    fn eq(&self, other: &GenericSubscriber<T, S>) -> bool {
         Arc::ptr_eq(&self.channel, &other.channel) && self.ri == other.ri
     }
 }
 
-impl<T, S: SwapSlot<T>> Eq for Subscriber<T, S> {}
+impl<T, S: SwapSlot<T>> Eq for GenericSubscriber<T, S> {}
 
-impl<T, S: SwapSlot<T>> Iterator for Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> Iterator for GenericSubscriber<T, S> {
     type Item = Arc<T>;
 
     fn next(&mut self) -> Option<Self::Item> {

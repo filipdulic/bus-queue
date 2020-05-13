@@ -3,12 +3,12 @@ use crate::swap_slot::SwapSlot;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct Publisher<T, S: SwapSlot<T>> {
+pub struct GenericPublisher<T, S: SwapSlot<T>> {
     /// Shared reference to the channel
     pub(super) channel: Arc<RingBuffer<T, S>>,
 }
 
-impl<T, S: SwapSlot<T>> Publisher<T, S> {
+impl<T, S: SwapSlot<T>> GenericPublisher<T, S> {
     /// Publishes values to the circular buffer at wi % size
     ///
     /// # Arguments
@@ -33,7 +33,7 @@ impl<T, S: SwapSlot<T>> Publisher<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for Publisher<T, S> {
+impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for GenericPublisher<T, S> {
     fn from(arc_channel: Arc<RingBuffer<T, S>>) -> Self {
         Self {
             channel: arc_channel,
@@ -42,16 +42,16 @@ impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for Publisher<T, S> {
 }
 
 /// Drop trait is used to let subscribers know that publisher is no longer available.
-impl<T, S: SwapSlot<T>> Drop for Publisher<T, S> {
+impl<T, S: SwapSlot<T>> Drop for GenericPublisher<T, S> {
     fn drop(&mut self) {
         self.close();
     }
 }
 
-impl<T, S: SwapSlot<T>> PartialEq for Publisher<T, S> {
-    fn eq(&self, other: &Publisher<T, S>) -> bool {
+impl<T, S: SwapSlot<T>> PartialEq for GenericPublisher<T, S> {
+    fn eq(&self, other: &GenericPublisher<T, S>) -> bool {
         Arc::ptr_eq(&self.channel, &other.channel)
     }
 }
 
-impl<T, S: SwapSlot<T>> Eq for Publisher<T, S> {}
+impl<T, S: SwapSlot<T>> Eq for GenericPublisher<T, S> {}

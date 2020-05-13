@@ -82,8 +82,9 @@
 //! assert_eq!(received2, expected);
 //! ```
 
+mod async_publisher;
+mod async_subscriber;
 mod atomic_counter;
-mod bus;
 pub mod flavors;
 mod piper;
 mod publisher;
@@ -91,35 +92,49 @@ mod ring_buffer;
 mod subscriber;
 mod swap_slot;
 
+pub use crate::async_publisher::GenericAsyncPublisher;
+pub use crate::async_subscriber::GenericAsyncSubscriber;
+
+pub use crate::publisher::GenericPublisher;
+pub use crate::subscriber::GenericSubscriber;
+pub use ring_buffer::RingBuffer;
 pub use swap_slot::SwapSlot;
 
 #[cfg(feature = "atomic-arc")]
 mod atomic;
 
 pub use atomic_counter::AtomicCounter;
-pub use flavors::arc_swap::{bounded, raw_bounded, AsyncPublisher, AsyncSubscriber};
-use piper::event::Event;
-pub use ring_buffer::RingBuffer;
-use std::sync::Arc;
+pub use flavors::arc_swap::{
+    bounded, raw_bounded, AsyncPublisher, AsyncSubscriber, Publisher, Subscriber,
+};
 
 /// Function used to create and initialise a (Sender, Receiver) tuple.
 pub fn bounded_queue<T, S: SwapSlot<T>>(
     size: usize,
-) -> (publisher::Publisher<T, S>, subscriber::Subscriber<T, S>) {
+) -> (
+    publisher::GenericPublisher<T, S>,
+    subscriber::GenericSubscriber<T, S>,
+) {
+    use std::sync::Arc;
     let arc_channel = Arc::new(RingBuffer::new(size));
     (
-        publisher::Publisher::from(arc_channel.clone()),
-        subscriber::Subscriber::from(arc_channel),
+        publisher::GenericPublisher::from(arc_channel.clone()),
+        subscriber::GenericSubscriber::from(arc_channel),
     )
 }
 
 pub fn async_bounded_queue<T, S: SwapSlot<T>>(
     size: usize,
-) -> (bus::AsyncPublisher<T, S>, bus::AsyncSubscriber<T, S>) {
+) -> (
+    async_publisher::GenericAsyncPublisher<T, S>,
+    async_subscriber::GenericAsyncSubscriber<T, S>,
+) {
+    use piper::event::Event;
+    use std::sync::Arc;
     let (publisher, subscriber) = bounded_queue(size);
     let event = Arc::new(Event::new());
     (
-        bus::AsyncPublisher::from((publisher, event.clone())),
-        bus::AsyncSubscriber::from((subscriber, event)),
+        async_publisher::GenericAsyncPublisher::from((publisher, event.clone())),
+        async_subscriber::GenericAsyncSubscriber::from((subscriber, event)),
     )
 }
