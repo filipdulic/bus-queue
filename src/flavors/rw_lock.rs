@@ -11,8 +11,8 @@ impl<T> SwapSlot<T> for RwSlot<T> {
         *self.write().unwrap() = Some(Arc::new(item));
     }
 
-    fn load(&self) -> Arc<T> {
-        self.read().unwrap().as_ref().unwrap().clone()
+    fn load(&self) -> Option<Arc<T>> {
+        self.read().unwrap().clone()
     }
 
     fn none() -> Self {
@@ -36,22 +36,34 @@ pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
 
 #[cfg(test)]
 mod test {
+    use crate::flavors::rw_lock::RwSlot;
     use crate::swap_slot::SwapSlot;
     use std::sync::Arc;
 
     #[test]
-    fn test_rwlock() {
-        use crate::flavors::rw_lock::RwSlot;
+    fn test_rwslot_none() {
+        let item: RwSlot<i32> = RwSlot::none();
+
+        assert_eq!(item.read().unwrap().clone(), None);
+    }
+
+    #[test]
+    fn test_rwslot_store() {
         let item = RwSlot::none();
-        {
-            let none = RwSlot::read(&item).unwrap();
-            assert_eq!(none.as_ref(), None);
-        }
-        SwapSlot::store(&item, 1);
+
+        SwapSlot::store(&item, 5);
+
+        assert_eq!(item.read().unwrap().clone(), Some(Arc::new(5)));
+    }
+
+    #[test]
+    fn test_rwslot_load() {
+        let item = RwSlot::none();
+        SwapSlot::store(&item, 10);
+
         let arc = SwapSlot::load(&item);
-        assert_eq!(*arc, 1);
-        assert_eq!(Arc::strong_count(&arc), 2);
-        SwapSlot::store(&item, 1);
-        assert_eq!(Arc::strong_count(&arc), 1);
+
+        assert_eq!(arc, Some(Arc::new(10)));
+        assert_eq!(Arc::strong_count(&arc.unwrap()), 2)
     }
 }

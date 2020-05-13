@@ -12,8 +12,8 @@ impl<T> SwapSlot<T> for ArcSwapOption<T> {
         self.store(Some(Arc::new(item)))
     }
 
-    fn load(&self) -> Arc<T> {
-        self.load_full().unwrap()
+    fn load(&self) -> Option<Arc<T>> {
+        self.load_full()
     }
 
     fn none() -> Self {
@@ -37,19 +37,33 @@ pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
 #[cfg(test)]
 mod test {
     use crate::swap_slot::SwapSlot;
+    use arc_swap::ArcSwapOption;
     use std::sync::Arc;
 
     #[test]
-    fn test_arcswap() {
-        use arc_swap::ArcSwapOption;
+    fn test_archswap_none() {
+        let item: ArcSwapOption<()> = ArcSwapOption::none();
+
+        assert_eq!(item.load_full(), None);
+    }
+
+    #[test]
+    fn test_archswap_store() {
         let item = ArcSwapOption::none();
-        let none = ArcSwapOption::load_full(&item);
-        assert_eq!(none, None);
-        SwapSlot::store(&item, 1);
+
+        SwapSlot::store(&item, 5);
+
+        assert_eq!(item.load_full(), Some(Arc::new(5)));
+    }
+
+    #[test]
+    fn test_archswap_load() {
+        let item = ArcSwapOption::none();
+        SwapSlot::store(&item, 10);
+
         let arc = SwapSlot::load(&item);
-        assert_eq!(*arc, 1);
-        assert_eq!(Arc::strong_count(&arc), 2);
-        SwapSlot::store(&item, 1);
-        assert_eq!(Arc::strong_count(&arc), 1);
+
+        assert_eq!(arc, Some(Arc::new(10)));
+        assert_eq!(Arc::strong_count(&arc.unwrap()), 2)
     }
 }
