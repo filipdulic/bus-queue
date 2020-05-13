@@ -1,9 +1,6 @@
 #![allow(dead_code)]
 use crate::atomic::atomic_arc::AtomicArc;
-use crate::bus;
-use crate::channel;
-use crate::swap_slot::SwapSlot;
-use crate::{async_bounded_queue, bounded_queue};
+use crate::{async_bounded_queue, bounded_queue, bus, publisher, subscriber, SwapSlot};
 use std::sync::Arc;
 
 pub type Slot<T> = AtomicArc<T>;
@@ -22,8 +19,8 @@ impl<T> SwapSlot<T> for AtomicArc<T> {
     }
 }
 
-pub type Publisher<T> = channel::Publisher<T, Slot<T>>;
-pub type Subscriber<T> = channel::Subscriber<T, Slot<T>>;
+pub type Publisher<T> = publisher::Publisher<T, Slot<T>>;
+pub type Subscriber<T> = subscriber::Subscriber<T, Slot<T>>;
 
 pub fn raw_bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
     bounded_queue::<T, Slot<T>>(size)

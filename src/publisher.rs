@@ -1,4 +1,4 @@
-use crate::channel::{RingBuffer, SendError};
+use crate::ring_buffer::{RingBuffer, SendError};
 use crate::swap_slot::SwapSlot;
 use std::sync::Arc;
 
@@ -24,7 +24,7 @@ impl<T, S: SwapSlot<T>> Publisher<T, S> {
 
     /// Checks if nothings has been published yet
     pub fn is_empty(&self) -> bool {
-        self.channel.wi.get() == 0
+        self.channel.is_empty()
     }
 
     /// Closes the Sender

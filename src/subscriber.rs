@@ -1,5 +1,5 @@
 use crate::atomic_counter::AtomicCounter;
-use crate::channel::{RingBuffer, TryRecvError};
+use crate::ring_buffer::{RingBuffer, TryRecvError};
 use crate::swap_slot::SwapSlot;
 use std::sync::Arc;
 
@@ -49,7 +49,7 @@ impl<T, S: SwapSlot<T>> Subscriber<T, S> {
 
     /// Checks if nothings has been published yet.
     pub fn is_empty(&self) -> bool {
-        self.channel.wi.get() == self.ri.get()
+        self.channel.is_sub_empty(self.ri.get())
     }
 }
 

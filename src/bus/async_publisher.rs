@@ -1,5 +1,6 @@
-use crate::channel::{SendError, Publisher};
 use crate::piper::event::Event;
+use crate::publisher::Publisher;
+use crate::ring_buffer::SendError;
 use crate::swap_slot::SwapSlot;
 // use piper::Event;
 use futures_core::task::{self, Poll};

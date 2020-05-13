@@ -5,12 +5,6 @@ use crate::swap_slot::SwapSlot;
 use std::fmt::Debug;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
-mod publisher;
-mod subscriber;
-
-pub use publisher::Publisher;
-pub use subscriber::Subscriber;
-
 #[derive(Debug)]
 pub struct RingBuffer<T, S: SwapSlot<T>> {
     /// Circular buffer
@@ -93,7 +87,7 @@ impl<T, S: SwapSlot<T>> RingBuffer<T, S> {
         self.is_available.store(false, Ordering::Relaxed);
     }
     /// Returns true if the sender is available, otherwise false
-    fn is_available(&self) -> bool {
+    pub fn is_available(&self) -> bool {
         self.is_available.load(Ordering::Relaxed)
     }
 
@@ -105,6 +99,11 @@ impl<T, S: SwapSlot<T>> RingBuffer<T, S> {
     /// Checks if nothings has been published yet
     pub fn is_empty(&self) -> bool {
         self.wi.get() == 0
+    }
+
+    /// Checks if subscriber has read all published items
+    pub fn is_sub_empty(&self, ri: usize) -> bool {
+        self.wi.get() == ri
     }
 
     /// Increment the number of subs
@@ -128,8 +127,8 @@ impl<T, S: SwapSlot<T>> Drop for RingBuffer<T, S> {
 #[cfg(test)]
 mod test {
     use super::SwapSlot;
-    use crate::channel::TryRecvError;
     use crate::raw_bounded as bounded;
+    use crate::ring_buffer::TryRecvError;
 
     #[test]
     fn subcount() {
