@@ -94,4 +94,4 @@ pub use swap_slot::SwapSlot;
 #[cfg(feature = "atomic-arc")]
 mod atomic;
 
-pub use flavors::arc_swap::{bounded, raw_bounded, Publisher, Slot, Subscriber};
+pub use flavors::arc_swap::{bounded, raw_bounded, Publisher, Subscriber};
