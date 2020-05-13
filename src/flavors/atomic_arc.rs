@@ -3,6 +3,7 @@ use crate::atomic::atomic_arc::AtomicArc;
 use crate::bus;
 use crate::channel;
 use crate::swap_slot::SwapSlot;
+use crate::{async_bounded_queue, bounded_queue};
 use std::sync::Arc;
 
 pub type Slot<T> = AtomicArc<T>;
@@ -20,18 +21,19 @@ impl<T> SwapSlot<T> for AtomicArc<T> {
         AtomicArc::new(None)
     }
 }
-pub type Sender<T> = channel::Sender<T, AtomicArc<T>>;
-pub type Receiver<T> = channel::Receiver<T, AtomicArc<T>>;
+
+pub type Sender<T> = channel::Sender<T, Slot<T>>;
+pub type Receiver<T> = channel::Receiver<T, Slot<T>>;
 
 pub fn raw_bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
-    channel::bounded::<T, AtomicArc<T>>(size)
+    bounded_queue::<T, Slot<T>>(size)
 }
 
-pub type Publisher<T> = bus::Publisher<T, AtomicArc<T>>;
-pub type Subscriber<T> = bus::Subscriber<T, AtomicArc<T>>;
+pub type Publisher<T> = bus::Publisher<T, Slot<T>>;
+pub type Subscriber<T> = bus::Subscriber<T, Slot<T>>;
 
 pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
-    bus::bounded::<T, AtomicArc<T>>(size)
+    async_bounded_queue::<T, Slot<T>>(size)
 }
 
 #[cfg(test)]

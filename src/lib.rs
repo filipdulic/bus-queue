@@ -83,8 +83,8 @@
 //! ```
 
 mod atomic_counter;
-pub mod bus;
-pub mod channel;
+mod bus;
+mod channel;
 pub mod flavors;
 mod piper;
 mod swap_slot;
@@ -94,4 +94,29 @@ pub use swap_slot::SwapSlot;
 #[cfg(feature = "atomic-arc")]
 mod atomic;
 
+pub use atomic_counter::AtomicCounter;
+pub use bus::{Publisher as AsyncPublisher, Subscriber as AsyncSubscriber};
+pub use channel::{Channel, Receiver, Sender};
 pub use flavors::arc_swap::{bounded, raw_bounded, Publisher, Subscriber};
+use piper::event::Event;
+use std::sync::Arc;
+
+/// Function used to create and initialise a (Sender, Receiver) tuple.
+pub fn bounded_queue<T, S: SwapSlot<T>>(size: usize) -> (Sender<T, S>, Receiver<T, S>) {
+    let arc_channel = Arc::new(Channel::new(size));
+    (
+        Sender::from(arc_channel.clone()),
+        Receiver::from(arc_channel),
+    )
+}
+
+pub fn async_bounded_queue<T, S: SwapSlot<T>>(
+    size: usize,
+) -> (AsyncPublisher<T, S>, AsyncSubscriber<T, S>) {
+    let (publisher, subscriber) = bounded_queue(size);
+    let event = Arc::new(Event::new());
+    (
+        AsyncPublisher::from((publisher, event.clone())),
+        AsyncSubscriber::from((subscriber, event)),
+    )
+}

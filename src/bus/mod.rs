@@ -1,24 +1,9 @@
-use crate::channel::bounded as raw_bounded;
-use crate::piper::event::Event;
-use crate::swap_slot::SwapSlot;
-// use piper::Event;
-use std::sync::Arc;
-
 mod publisher;
 mod subscriber;
 
 pub use publisher::Publisher;
 pub use subscriber::Subscriber;
 
-#[allow(dead_code)]
-pub fn bounded<T, S: SwapSlot<T>>(size: usize) -> (Publisher<T, S>, Subscriber<T, S>) {
-    let (sender, receiver) = raw_bounded(size);
-    let event = Arc::new(Event::new());
-    (
-        Publisher::from((sender, event.clone())),
-        Subscriber::from((receiver, event)),
-    )
-}
 #[cfg(test)]
 mod test {
     use crate::bounded as default_bounded;

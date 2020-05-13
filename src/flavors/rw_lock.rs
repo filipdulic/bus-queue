@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use crate::swap_slot::SwapSlot;
+use crate::{async_bounded_queue, bounded_queue};
 use crate::{bus, channel};
 use std::sync::{Arc, RwLock};
 
@@ -20,18 +21,18 @@ impl<T> SwapSlot<T> for RwSlot<T> {
     }
 }
 
-pub type Sender<T> = channel::Sender<T, RwSlot<T>>;
-pub type Receiver<T> = channel::Receiver<T, RwSlot<T>>;
+pub type Sender<T> = channel::Sender<T, Slot<T>>;
+pub type Receiver<T> = channel::Receiver<T, Slot<T>>;
 
 pub fn raw_bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
-    channel::bounded::<T, RwSlot<T>>(size)
+    bounded_queue::<T, Slot<T>>(size)
 }
 
-pub type Publisher<T> = bus::Publisher<T, RwSlot<T>>;
-pub type Subscriber<T> = bus::Subscriber<T, RwSlot<T>>;
+pub type Publisher<T> = bus::Publisher<T, Slot<T>>;
+pub type Subscriber<T> = bus::Subscriber<T, Slot<T>>;
 
 pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
-    bus::bounded::<T, RwSlot<T>>(size)
+    async_bounded_queue::<T, Slot<T>>(size)
 }
 
 #[cfg(test)]

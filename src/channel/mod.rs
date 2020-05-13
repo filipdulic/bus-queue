@@ -11,28 +11,6 @@ mod sender;
 pub use receiver::Receiver;
 pub use sender::Sender;
 
-/// Function used to create and initialise a (Sender, Receiver) tuple.
-pub fn bounded<T, S: SwapSlot<T>>(size: usize) -> (Sender<T, S>, Receiver<T, S>) {
-    let size = size + 1;
-    let mut buffer = Vec::with_capacity(size);
-    for _i in 0..size {
-        buffer.push(S::none())
-    }
-    let channel: Channel<T, S> = Channel {
-        buffer,
-        size,
-        wi: AtomicCounter::new(0),
-        sub_count: AtomicCounter::new(1),
-        is_available: AtomicBool::new(true),
-        ph: std::marker::PhantomData,
-    };
-    let arc_channel = Arc::new(channel);
-    (
-        Sender::from(arc_channel.clone()),
-        Receiver::from(arc_channel),
-    )
-}
-
 #[derive(Debug)]
 pub struct Channel<T, S: SwapSlot<T>> {
     /// Circular buffer
@@ -49,6 +27,21 @@ pub struct Channel<T, S: SwapSlot<T>> {
 }
 
 impl<T, S: SwapSlot<T>> Channel<T, S> {
+    pub fn new(size: usize) -> Self {
+        let size = size + 1;
+        let mut buffer = Vec::with_capacity(size);
+        for _i in 0..size {
+            buffer.push(S::none())
+        }
+        Self {
+            buffer,
+            size,
+            wi: AtomicCounter::new(0),
+            sub_count: AtomicCounter::new(1),
+            is_available: AtomicBool::new(true),
+            ph: std::marker::PhantomData,
+        }
+    }
     /// Publishes values to the circular buffer at wi % size
     ///
     /// # Arguments
