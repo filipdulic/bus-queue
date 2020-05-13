@@ -1,20 +1,20 @@
 use crate::atomic_counter::AtomicCounter;
-use crate::channel::{Channel, TryRecvError};
+use crate::channel::{RingBuffer, TryRecvError};
 use crate::swap_slot::SwapSlot;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct Receiver<T, S: SwapSlot<T>> {
+pub struct Subscriber<T, S: SwapSlot<T>> {
     /// Shared reference to the channel
-    pub(super) channel: Arc<Channel<T, S>>,
+    pub(super) channel: Arc<RingBuffer<T, S>>,
     /// Read index pointer
     pub(super) ri: AtomicCounter,
     /// how many items should the receiver skip when the writer overflows
     pub(super) skip_items: usize,
 }
 
-impl<T, S: SwapSlot<T>> From<Arc<Channel<T, S>>> for Receiver<T, S> {
-    fn from(arc_channel: Arc<Channel<T, S>>) -> Self {
+impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for Subscriber<T, S> {
+    fn from(arc_channel: Arc<RingBuffer<T, S>>) -> Self {
         Self {
             channel: arc_channel,
             skip_items: 0,
@@ -23,7 +23,7 @@ impl<T, S: SwapSlot<T>> From<Arc<Channel<T, S>>> for Receiver<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> Receiver<T, S> {
+impl<T, S: SwapSlot<T>> Subscriber<T, S> {
     /// Returns true if the sender is available, otherwise false
     #[allow(dead_code)]
     pub fn is_sender_available(&self) -> bool {
@@ -54,7 +54,7 @@ impl<T, S: SwapSlot<T>> Receiver<T, S> {
 }
 
 /// Clone trait is used to create a Receiver which receives messages from the same Sender
-impl<T, S: SwapSlot<T>> Clone for Receiver<T, S> {
+impl<T, S: SwapSlot<T>> Clone for Subscriber<T, S> {
     fn clone(&self) -> Self {
         self.channel.inc_sub_count();
         Self {
@@ -65,21 +65,21 @@ impl<T, S: SwapSlot<T>> Clone for Receiver<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> Drop for Receiver<T, S> {
+impl<T, S: SwapSlot<T>> Drop for Subscriber<T, S> {
     fn drop(&mut self) {
         self.channel.dec_sub_count();
     }
 }
 
-impl<T, S: SwapSlot<T>> PartialEq for Receiver<T, S> {
-    fn eq(&self, other: &Receiver<T, S>) -> bool {
+impl<T, S: SwapSlot<T>> PartialEq for Subscriber<T, S> {
+    fn eq(&self, other: &Subscriber<T, S>) -> bool {
         Arc::ptr_eq(&self.channel, &other.channel) && self.ri == other.ri
     }
 }
 
-impl<T, S: SwapSlot<T>> Eq for Receiver<T, S> {}
+impl<T, S: SwapSlot<T>> Eq for Subscriber<T, S> {}
 
-impl<T, S: SwapSlot<T>> Iterator for Receiver<T, S> {
+impl<T, S: SwapSlot<T>> Iterator for Subscriber<T, S> {
     type Item = Arc<T>;
 
     fn next(&mut self) -> Option<Self::Item> {

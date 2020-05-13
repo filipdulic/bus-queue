@@ -22,17 +22,17 @@ impl<T> SwapSlot<T> for AtomicArc<T> {
     }
 }
 
-pub type Sender<T> = channel::Sender<T, Slot<T>>;
-pub type Receiver<T> = channel::Receiver<T, Slot<T>>;
+pub type Publisher<T> = channel::Publisher<T, Slot<T>>;
+pub type Subscriber<T> = channel::Subscriber<T, Slot<T>>;
 
-pub fn raw_bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
+pub fn raw_bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
     bounded_queue::<T, Slot<T>>(size)
 }
 
-pub type Publisher<T> = bus::Publisher<T, Slot<T>>;
-pub type Subscriber<T> = bus::Subscriber<T, Slot<T>>;
+pub type AsyncPublisher<T> = bus::AsyncPublisher<T, Slot<T>>;
+pub type AsyncSubscriber<T> = bus::AsyncSubscriber<T, Slot<T>>;
 
-pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
+pub fn bounded<T>(size: usize) -> (AsyncPublisher<T>, AsyncSubscriber<T>) {
     async_bounded_queue::<T, Slot<T>>(size)
 }
 

@@ -95,28 +95,29 @@ pub use swap_slot::SwapSlot;
 mod atomic;
 
 pub use atomic_counter::AtomicCounter;
-pub use bus::{Publisher as AsyncPublisher, Subscriber as AsyncSubscriber};
-pub use channel::{Channel, Receiver, Sender};
-pub use flavors::arc_swap::{bounded, raw_bounded, Publisher, Subscriber};
+pub use channel::RingBuffer;
+pub use flavors::arc_swap::{bounded, raw_bounded, AsyncPublisher, AsyncSubscriber};
 use piper::event::Event;
 use std::sync::Arc;
 
 /// Function used to create and initialise a (Sender, Receiver) tuple.
-pub fn bounded_queue<T, S: SwapSlot<T>>(size: usize) -> (Sender<T, S>, Receiver<T, S>) {
-    let arc_channel = Arc::new(Channel::new(size));
+pub fn bounded_queue<T, S: SwapSlot<T>>(
+    size: usize,
+) -> (channel::Publisher<T, S>, channel::Subscriber<T, S>) {
+    let arc_channel = Arc::new(RingBuffer::new(size));
     (
-        Sender::from(arc_channel.clone()),
-        Receiver::from(arc_channel),
+        channel::Publisher::from(arc_channel.clone()),
+        channel::Subscriber::from(arc_channel),
     )
 }
 
 pub fn async_bounded_queue<T, S: SwapSlot<T>>(
     size: usize,
-) -> (AsyncPublisher<T, S>, AsyncSubscriber<T, S>) {
+) -> (bus::AsyncPublisher<T, S>, bus::AsyncSubscriber<T, S>) {
     let (publisher, subscriber) = bounded_queue(size);
     let event = Arc::new(Event::new());
     (
-        AsyncPublisher::from((publisher, event.clone())),
-        AsyncSubscriber::from((subscriber, event)),
+        bus::AsyncPublisher::from((publisher, event.clone())),
+        bus::AsyncSubscriber::from((subscriber, event)),
     )
 }

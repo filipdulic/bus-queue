@@ -5,14 +5,14 @@ use crate::swap_slot::SwapSlot;
 use std::fmt::Debug;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
-mod receiver;
-mod sender;
+mod publisher;
+mod subscriber;
 
-pub use receiver::Receiver;
-pub use sender::Sender;
+pub use publisher::Publisher;
+pub use subscriber::Subscriber;
 
 #[derive(Debug)]
-pub struct Channel<T, S: SwapSlot<T>> {
+pub struct RingBuffer<T, S: SwapSlot<T>> {
     /// Circular buffer
     buffer: Vec<S>,
     /// Size of the buffer
@@ -26,7 +26,7 @@ pub struct Channel<T, S: SwapSlot<T>> {
     ph: std::marker::PhantomData<T>,
 }
 
-impl<T, S: SwapSlot<T>> Channel<T, S> {
+impl<T, S: SwapSlot<T>> RingBuffer<T, S> {
     pub fn new(size: usize) -> Self {
         let size = size + 1;
         let mut buffer = Vec::with_capacity(size);
@@ -119,7 +119,7 @@ impl<T, S: SwapSlot<T>> Channel<T, S> {
 }
 
 /// Drop trait is used to let subscribers know that publisher is no longer available.
-impl<T, S: SwapSlot<T>> Drop for Channel<T, S> {
+impl<T, S: SwapSlot<T>> Drop for RingBuffer<T, S> {
     fn drop(&mut self) {
         self.close();
     }
