@@ -88,7 +88,9 @@ impl<T, S: SwapSlot<T>> Channel<T, S> {
                 );
             } else {
                 ri.inc();
-                return Ok(val);
+                // NOTE: unwrap is safe to use, because the reader would never read a slot that
+                // hasn't been written to.
+                return Ok(val.unwrap());
             }
         }
     }
@@ -226,7 +228,7 @@ mod test {
         // Should be reading from the last element in the buffer
         let index = (receiver.channel.wi.get() - receiver.channel.size + 1) % receiver.channel.size;
 
-        assert_eq!(*SwapSlot::load(&receiver.channel.buffer[index]), 7);
+        assert_eq!(*SwapSlot::load(&receiver.channel.buffer[index]).unwrap(), 7);
         assert_eq!(*receiver.try_recv().unwrap(), 7);
 
         // Cloned receiver start reading where the original receiver left off
