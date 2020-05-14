@@ -43,9 +43,9 @@
 //!
 //! ```rust
 //! extern crate bus_queue;
-//! use bus_queue::raw_bounded;
+//! use bus_queue::flavors::arc_swap::bounded;
 //!
-//! let (tx, rx) = raw_bounded(10);
+//! let (tx, rx) = bounded(10);
 //! (1..15).for_each(|x| tx.broadcast(x).unwrap());
 //!
 //! let received: Vec<i32> = rx.map(|x| *x).collect();
@@ -58,12 +58,12 @@
 //! ## Simple async usage
 //!
 //! ```rust
-//! use bus_queue::bounded;
+//! use bus_queue::flavors::arc_swap::async_bounded;
 //! use futures::executor::block_on;
 //! use futures::stream;
 //! use futures::StreamExt;
 //!
-//! let (publisher, subscriber1) = bounded(10);
+//! let (publisher, subscriber1) = async_bounded(10);
 //! let subscriber2 = subscriber1.clone();
 //!
 //! block_on(async move {
@@ -92,11 +92,10 @@ mod ring_buffer;
 mod subscriber;
 mod swap_slot;
 
-pub use crate::async_publisher::GenericAsyncPublisher;
-pub use crate::async_subscriber::GenericAsyncSubscriber;
-
-pub use crate::publisher::GenericPublisher;
-pub use crate::subscriber::GenericSubscriber;
+pub use crate::async_publisher::AsyncPublisher;
+pub use crate::async_subscriber::AsyncSubscriber;
+pub use crate::publisher::Publisher;
+pub use crate::subscriber::Subscriber;
 pub use ring_buffer::RingBuffer;
 pub use swap_slot::SwapSlot;
 
@@ -104,37 +103,31 @@ pub use swap_slot::SwapSlot;
 mod atomic;
 
 pub use atomic_counter::AtomicCounter;
-pub use flavors::arc_swap::{
-    bounded, raw_bounded, AsyncPublisher, AsyncSubscriber, Publisher, Subscriber,
-};
 
 /// Function used to create and initialise a (Sender, Receiver) tuple.
-pub fn bounded_queue<T, S: SwapSlot<T>>(
+pub fn bounded<T, S: SwapSlot<T>>(
     size: usize,
-) -> (
-    publisher::GenericPublisher<T, S>,
-    subscriber::GenericSubscriber<T, S>,
-) {
+) -> (publisher::Publisher<T, S>, subscriber::Subscriber<T, S>) {
     use std::sync::Arc;
     let arc_channel = Arc::new(RingBuffer::new(size));
     (
-        publisher::GenericPublisher::from(arc_channel.clone()),
-        subscriber::GenericSubscriber::from(arc_channel),
+        publisher::Publisher::from(arc_channel.clone()),
+        subscriber::Subscriber::from(arc_channel),
     )
 }
 
-pub fn async_bounded_queue<T, S: SwapSlot<T>>(
+pub fn async_bounded<T, S: SwapSlot<T>>(
     size: usize,
 ) -> (
-    async_publisher::GenericAsyncPublisher<T, S>,
-    async_subscriber::GenericAsyncSubscriber<T, S>,
+    async_publisher::AsyncPublisher<T, S>,
+    async_subscriber::AsyncSubscriber<T, S>,
 ) {
     use piper::event::Event;
     use std::sync::Arc;
-    let (publisher, subscriber) = bounded_queue(size);
+    let (publisher, subscriber) = bounded(size);
     let event = Arc::new(Event::new());
     (
-        async_publisher::GenericAsyncPublisher::from((publisher, event.clone())),
-        async_subscriber::GenericAsyncSubscriber::from((subscriber, event)),
+        async_publisher::AsyncPublisher::from((publisher, event.clone())),
+        async_subscriber::AsyncSubscriber::from((subscriber, event)),
     )
 }

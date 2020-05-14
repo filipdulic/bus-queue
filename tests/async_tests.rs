@@ -1,7 +1,9 @@
-use bus_queue::bounded;
-use futures::executor;
-use futures::{task::SpawnExt, SinkExt, StreamExt};
+use bus_queue::flavors::arc_swap::async_bounded;
+use futures::{executor, pin_mut, task::Poll, task::SpawnExt, FutureExt, SinkExt, StreamExt};
+use futures_test::task::noop_context;
+use futures_test::{assert_stream_done, assert_stream_next, assert_stream_pending};
 use rand::Rng;
+use std::sync::Arc;
 use std::time::Duration;
 
 // pool.spawn alternative
@@ -21,7 +23,7 @@ fn test_subscriber_item_drop_related_to_ratio_of_timing() {
     let sub_multiplier = rng.gen_range(MIN_SUB_MULTIPLIER, MAX_SUB_MULTIPLIER);
     let sub_time = Duration::from_millis(sub_multiplier * pub_ms);
     let pool = executor::ThreadPool::new().unwrap();
-    let (mut publisher, mut subscriber) = bounded::<usize>(1);
+    let (mut publisher, mut subscriber) = async_bounded::<usize>(1);
     pool.spawn(async move {
         std::thread::sleep(LEAD_IN_TIME);
         for i in 0usize..NUMBER_OF_GENERATED {
@@ -45,16 +47,9 @@ fn test_subscriber_item_drop_related_to_ratio_of_timing() {
             && (vec.len() <= (NUMBER_OF_GENERATED / (sub_multiplier as usize - 1usize)))
     )
 }
-
-use crate::bounded as default_bounded;
-use futures::{pin_mut, task::Poll, FutureExt};
-use futures_test::task::noop_context;
-use futures_test::{assert_stream_done, assert_stream_next, assert_stream_pending};
-use std::sync::Arc;
-
 #[test]
 fn subscriber_is_in_pending_state_before_first_data_is_published() {
-    let (_publisher, subscriber) = default_bounded::<usize>(1);
+    let (_publisher, subscriber) = async_bounded::<usize>(1);
     pin_mut!(subscriber);
 
     // Assert that subscriber stream is pending before the publisher publishes.
@@ -64,7 +59,7 @@ fn subscriber_is_in_pending_state_before_first_data_is_published() {
 #[test]
 fn subscriber_receives_an_item_after_it_is_published() {
     let mut cx = noop_context();
-    let (publisher, subscriber) = default_bounded::<usize>(1);
+    let (publisher, subscriber) = async_bounded::<usize>(1);
     pin_mut!(subscriber);
     pin_mut!(publisher);
 
@@ -78,7 +73,7 @@ fn subscriber_receives_an_item_after_it_is_published() {
 #[test]
 fn subscriber_recieves_an_item_after_publisher_overflowed() {
     let mut cx = noop_context();
-    let (publisher, subscriber) = default_bounded::<usize>(1);
+    let (publisher, subscriber) = async_bounded::<usize>(1);
     pin_mut!(subscriber);
     pin_mut!(publisher);
 
@@ -96,7 +91,7 @@ fn subscriber_recieves_an_item_after_publisher_overflowed() {
 #[test]
 fn subscriber_is_done_after_publisher_closes() {
     let mut cx = noop_context();
-    let (publisher, subscriber) = default_bounded::<usize>(1);
+    let (publisher, subscriber) = async_bounded::<usize>(1);
     pin_mut!(subscriber);
     pin_mut!(publisher);
 
@@ -109,7 +104,7 @@ fn subscriber_is_done_after_publisher_closes() {
 
 #[test]
 fn subscriber_is_done_after_publisher_drop() {
-    let (publisher, subscriber) = default_bounded::<usize>(1);
+    let (publisher, subscriber) = async_bounded::<usize>(1);
     pin_mut!(subscriber);
 
     // Drop Publisher
@@ -121,7 +116,7 @@ fn subscriber_is_done_after_publisher_drop() {
 
 #[test]
 fn notify() {
-    let (publisher, subscriber) = default_bounded::<usize>(1);
+    let (publisher, subscriber) = async_bounded::<usize>(1);
     pin_mut!(subscriber);
     pin_mut!(publisher);
 
@@ -152,7 +147,7 @@ fn notify() {
 }
 #[test]
 fn test_set_skip_items() {
-    let (publisher, subscriber1) = default_bounded(3);
+    let (publisher, subscriber1) = async_bounded(3);
     let mut subscriber2 = subscriber1.clone();
     let mut subscriber3 = subscriber1.clone();
     let mut subscriber4 = subscriber1.clone();
@@ -178,8 +173,8 @@ fn test_set_skip_items() {
 
 #[test]
 fn test_publisher_eq() {
-    let (publisher1, _) = default_bounded::<i32>(1);
-    let (publisher2, _) = default_bounded::<i32>(1);
+    let (publisher1, _) = async_bounded::<i32>(1);
+    let (publisher2, _) = async_bounded::<i32>(1);
     assert!(!publisher1.eq(&publisher2));
     assert!(publisher1.eq(&publisher1));
     assert!(publisher2.eq(&publisher2));
@@ -187,9 +182,9 @@ fn test_publisher_eq() {
 
 #[test]
 fn test_subscriber_eq() {
-    let (_, subscriber1) = default_bounded::<i32>(1);
+    let (_, subscriber1) = async_bounded::<i32>(1);
     let subscriber2 = subscriber1.clone();
-    let (_, subscriber3) = default_bounded::<i32>(1);
+    let (_, subscriber3) = async_bounded::<i32>(1);
     assert_eq!(subscriber1, subscriber2);
     assert_ne!(subscriber2, subscriber3);
     assert_ne!(subscriber1, subscriber3);

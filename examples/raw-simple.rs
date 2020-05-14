@@ -1,7 +1,7 @@
-use bus_queue::raw_bounded;
+use bus_queue::flavors::arc_swap::bounded;
 
 fn main() {
-    let (tx, rx) = raw_bounded(10);
+    let (tx, rx) = bounded(10);
     (1..15).for_each(|x| tx.broadcast(x).unwrap());
 
     let received: Vec<i32> = rx.map(|x| *x).collect();

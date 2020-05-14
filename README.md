@@ -43,9 +43,9 @@ instigating a propagation of failure among threads if one unexpectedly dies.
 
 ```rust
 extern crate bus_queue;
-use bus_queue::raw_bounded;
+use bus_queue::flavors::arc_swap::bounded;
 
-let (tx, rx) = raw_bounded(10);
+let (tx, rx) = bounded(10);
 (1..15).for_each(|x| tx.broadcast(x).unwrap());
 
 let received: Vec<i32> = rx.map(|x| *x).collect();
@@ -58,12 +58,12 @@ assert_eq!(expected, received);
 ## Simple async usage
 
 ```rust
-use bus_queue::bounded;
+use bus_queue::flavors::arc_swap::async_bounded;
 use futures::executor::block_on;
 use futures::stream;
 use futures::StreamExt;
 
-let (publisher, subscriber1) = bounded(10);
+let (publisher, subscriber1) = async_bounded(10);
 let subscriber2 = subscriber1.clone();
 
 block_on(async move {

@@ -1,8 +1,5 @@
 #![allow(dead_code)]
-use crate::{
-    async_bounded_queue, async_publisher, async_subscriber, bounded_queue, publisher, subscriber,
-    SwapSlot,
-};
+use crate::{async_publisher, async_subscriber, publisher, subscriber, SwapSlot};
 use std::sync::{Arc, RwLock};
 
 pub type Slot<T> = RwSlot<T>;
@@ -22,18 +19,18 @@ impl<T> SwapSlot<T> for RwSlot<T> {
     }
 }
 
-pub type Publisher<T> = publisher::GenericPublisher<T, Slot<T>>;
-pub type Subscriber<T> = subscriber::GenericSubscriber<T, Slot<T>>;
+pub type Publisher<T> = publisher::Publisher<T, Slot<T>>;
+pub type Subscriber<T> = subscriber::Subscriber<T, Slot<T>>;
 
-pub fn raw_bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
-    bounded_queue::<T, Slot<T>>(size)
+pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
+    crate::bounded::<T, Slot<T>>(size)
 }
 
-pub type AsyncPublisher<T> = async_publisher::GenericAsyncPublisher<T, Slot<T>>;
-pub type AsyncSubscriber<T> = async_subscriber::GenericAsyncSubscriber<T, Slot<T>>;
+pub type AsyncPublisher<T> = async_publisher::AsyncPublisher<T, Slot<T>>;
+pub type AsyncSubscriber<T> = async_subscriber::AsyncSubscriber<T, Slot<T>>;
 
-pub fn bounded<T>(size: usize) -> (AsyncPublisher<T>, AsyncSubscriber<T>) {
-    async_bounded_queue::<T, Slot<T>>(size)
+pub fn async_bounded<T>(size: usize) -> (AsyncPublisher<T>, AsyncSubscriber<T>) {
+    crate::async_bounded::<T, Slot<T>>(size)
 }
 
 #[cfg(test)]

@@ -1,9 +1,9 @@
-use bus_queue::bounded;
+use bus_queue::flavors::arc_swap::async_bounded;
 use futures::executor::block_on;
 use futures::stream::{iter, StreamExt};
 
 fn main() {
-    let (publisher, subscriber1) = bounded(10);
+    let (publisher, subscriber1) = async_bounded(10);
     let subscriber2 = subscriber1.clone();
 
     block_on(async move {
