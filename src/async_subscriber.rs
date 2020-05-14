@@ -1,5 +1,6 @@
-use crate::channel::{Receiver, TryRecvError};
 use crate::piper::event::{Event, EventListener};
+use crate::ring_buffer::TryRecvError;
+use crate::subscriber::Subscriber;
 use crate::swap_slot::SwapSlot;
 //use piper::{Event, EventListener};
 use futures_core::{
@@ -10,46 +11,46 @@ use futures_core::{
 use std::pin::Pin;
 use std::sync::Arc;
 
-pub struct Subscriber<T, S: SwapSlot<T>> {
-    pub(super) receiver: Receiver<T, S>,
+pub struct AsyncSubscriber<T, S: SwapSlot<T>> {
+    pub(super) subscriber: Subscriber<T, S>,
     pub(super) event: Arc<Event>,
     pub(super) listener: Option<EventListener>,
 }
 
-impl<T, S: SwapSlot<T>> From<(Receiver<T, S>, Arc<Event>)> for Subscriber<T, S> {
-    fn from(input: (Receiver<T, S>, Arc<Event>)) -> Self {
+impl<T, S: SwapSlot<T>> From<(Subscriber<T, S>, Arc<Event>)> for AsyncSubscriber<T, S> {
+    fn from(input: (Subscriber<T, S>, Arc<Event>)) -> Self {
         Self {
-            receiver: input.0,
+            subscriber: input.0,
             event: input.1,
             listener: None,
         }
     }
 }
 
-impl<T, S: SwapSlot<T>> std::fmt::Debug for Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> std::fmt::Debug for AsyncSubscriber<T, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Subscriber").finish()
     }
 }
 
-impl<T, S: SwapSlot<T>> Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> AsyncSubscriber<T, S> {
     #[allow(dead_code)]
     pub fn set_skip_items(&mut self, skip_items: usize) {
-        self.receiver.set_skip_items(skip_items);
+        self.subscriber.set_skip_items(skip_items);
     }
 
     /// Returns the number of remaining in the stream.
     pub fn len(&self) -> usize {
-        self.receiver.len()
+        self.subscriber.len()
     }
 
     /// Checks if stream is empty.
     pub fn is_empty(&self) -> bool {
-        self.receiver.is_empty()
+        self.subscriber.is_empty()
     }
 }
 
-impl<T, S: SwapSlot<T>> Stream for Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> Stream for AsyncSubscriber<T, S> {
     type Item = Arc<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
@@ -61,7 +62,7 @@ impl<T, S: SwapSlot<T>> Stream for Subscriber<T, S> {
             }
             loop {
                 // Attempt to receive a message.
-                match self.receiver.try_recv() {
+                match self.subscriber.try_recv() {
                     Ok(item) => {
                         // The stream is not blocked on an event - drop the listener.
                         self.listener = None;
@@ -90,20 +91,20 @@ impl<T, S: SwapSlot<T>> Stream for Subscriber<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> Clone for Subscriber<T, S> {
+impl<T, S: SwapSlot<T>> Clone for AsyncSubscriber<T, S> {
     fn clone(&self) -> Self {
         Self {
-            receiver: self.receiver.clone(),
+            subscriber: self.subscriber.clone(),
             event: self.event.clone(),
             listener: None,
         }
     }
 }
 
-impl<T, S: SwapSlot<T>> PartialEq for Subscriber<T, S> {
-    fn eq(&self, other: &Subscriber<T, S>) -> bool {
-        self.receiver == other.receiver
+impl<T, S: SwapSlot<T>> PartialEq for AsyncSubscriber<T, S> {
+    fn eq(&self, other: &AsyncSubscriber<T, S>) -> bool {
+        self.subscriber == other.subscriber
     }
 }
 
-impl<T, S: SwapSlot<T>> Eq for Subscriber<T, S> {}
+impl<T, S: SwapSlot<T>> Eq for AsyncSubscriber<T, S> {}

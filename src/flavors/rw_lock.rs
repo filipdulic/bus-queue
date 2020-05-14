@@ -1,6 +1,5 @@
 #![allow(dead_code)]
-use crate::swap_slot::SwapSlot;
-use crate::{bus, channel};
+use crate::{async_publisher, async_subscriber, publisher, subscriber, SwapSlot};
 use std::sync::{Arc, RwLock};
 
 pub type Slot<T> = RwSlot<T>;
@@ -20,18 +19,18 @@ impl<T> SwapSlot<T> for RwSlot<T> {
     }
 }
 
-pub type Sender<T> = channel::Sender<T, RwSlot<T>>;
-pub type Receiver<T> = channel::Receiver<T, RwSlot<T>>;
-
-pub fn raw_bounded<T>(size: usize) -> (Sender<T>, Receiver<T>) {
-    channel::bounded::<T, RwSlot<T>>(size)
-}
-
-pub type Publisher<T> = bus::Publisher<T, RwSlot<T>>;
-pub type Subscriber<T> = bus::Subscriber<T, RwSlot<T>>;
+pub type Publisher<T> = publisher::Publisher<T, Slot<T>>;
+pub type Subscriber<T> = subscriber::Subscriber<T, Slot<T>>;
 
 pub fn bounded<T>(size: usize) -> (Publisher<T>, Subscriber<T>) {
-    bus::bounded::<T, RwSlot<T>>(size)
+    crate::bounded::<T, Slot<T>>(size)
+}
+
+pub type AsyncPublisher<T> = async_publisher::AsyncPublisher<T, Slot<T>>;
+pub type AsyncSubscriber<T> = async_subscriber::AsyncSubscriber<T, Slot<T>>;
+
+pub fn async_bounded<T>(size: usize) -> (AsyncPublisher<T>, AsyncSubscriber<T>) {
+    crate::async_bounded::<T, Slot<T>>(size)
 }
 
 #[cfg(test)]

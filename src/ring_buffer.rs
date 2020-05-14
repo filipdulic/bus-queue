@@ -5,36 +5,8 @@ use crate::swap_slot::SwapSlot;
 use std::fmt::Debug;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
-mod receiver;
-mod sender;
-
-pub use receiver::Receiver;
-pub use sender::Sender;
-
-/// Function used to create and initialise a (Sender, Receiver) tuple.
-pub fn bounded<T, S: SwapSlot<T>>(size: usize) -> (Sender<T, S>, Receiver<T, S>) {
-    let size = size + 1;
-    let mut buffer = Vec::with_capacity(size);
-    for _i in 0..size {
-        buffer.push(S::none())
-    }
-    let channel: Channel<T, S> = Channel {
-        buffer,
-        size,
-        wi: AtomicCounter::new(0),
-        sub_count: AtomicCounter::new(1),
-        is_available: AtomicBool::new(true),
-        ph: std::marker::PhantomData,
-    };
-    let arc_channel = Arc::new(channel);
-    (
-        Sender::from(arc_channel.clone()),
-        Receiver::from(arc_channel),
-    )
-}
-
 #[derive(Debug)]
-pub struct Channel<T, S: SwapSlot<T>> {
+pub struct RingBuffer<T, S: SwapSlot<T>> {
     /// Circular buffer
     buffer: Vec<S>,
     /// Size of the buffer
@@ -48,7 +20,22 @@ pub struct Channel<T, S: SwapSlot<T>> {
     ph: std::marker::PhantomData<T>,
 }
 
-impl<T, S: SwapSlot<T>> Channel<T, S> {
+impl<T, S: SwapSlot<T>> RingBuffer<T, S> {
+    pub fn new(size: usize) -> Self {
+        let size = size + 1;
+        let mut buffer = Vec::with_capacity(size);
+        for _i in 0..size {
+            buffer.push(S::none())
+        }
+        Self {
+            buffer,
+            size,
+            wi: AtomicCounter::new(0),
+            sub_count: AtomicCounter::new(1),
+            is_available: AtomicBool::new(true),
+            ph: std::marker::PhantomData,
+        }
+    }
     /// Publishes values to the circular buffer at wi % size
     ///
     /// # Arguments
@@ -100,7 +87,7 @@ impl<T, S: SwapSlot<T>> Channel<T, S> {
         self.is_available.store(false, Ordering::Relaxed);
     }
     /// Returns true if the sender is available, otherwise false
-    fn is_available(&self) -> bool {
+    pub fn is_available(&self) -> bool {
         self.is_available.load(Ordering::Relaxed)
     }
 
@@ -112,6 +99,11 @@ impl<T, S: SwapSlot<T>> Channel<T, S> {
     /// Checks if nothings has been published yet
     pub fn is_empty(&self) -> bool {
         self.wi.get() == 0
+    }
+
+    /// Checks if subscriber has read all published items
+    pub fn is_sub_empty(&self, ri: usize) -> bool {
+        self.wi.get() == ri
     }
 
     /// Increment the number of subs
@@ -126,7 +118,7 @@ impl<T, S: SwapSlot<T>> Channel<T, S> {
 }
 
 /// Drop trait is used to let subscribers know that publisher is no longer available.
-impl<T, S: SwapSlot<T>> Drop for Channel<T, S> {
+impl<T, S: SwapSlot<T>> Drop for RingBuffer<T, S> {
     fn drop(&mut self) {
         self.close();
     }
@@ -135,20 +127,20 @@ impl<T, S: SwapSlot<T>> Drop for Channel<T, S> {
 #[cfg(test)]
 mod test {
     use super::SwapSlot;
-    use crate::channel::TryRecvError;
-    use crate::raw_bounded as bounded;
+    use crate::flavors::arc_swap::bounded;
+    use crate::ring_buffer::TryRecvError;
 
     #[test]
     fn subcount() {
         let (sender, receiver) = bounded::<()>(1);
         let receiver2 = receiver.clone();
-        assert_eq!(sender.channel.sub_count.get(), 2);
-        assert_eq!(receiver.channel.sub_count.get(), 2);
-        assert_eq!(receiver2.channel.sub_count.get(), 2);
+        assert_eq!(sender.buffer.sub_count.get(), 2);
+        assert_eq!(receiver.buffer.sub_count.get(), 2);
+        assert_eq!(receiver2.buffer.sub_count.get(), 2);
         drop(receiver2);
 
-        assert_eq!(sender.channel.sub_count.get(), 1);
-        assert_eq!(receiver.channel.sub_count.get(), 1);
+        assert_eq!(sender.buffer.sub_count.get(), 1);
+        assert_eq!(receiver.buffer.sub_count.get(), 1);
     }
 
     #[test]
@@ -226,9 +218,9 @@ mod test {
         }
 
         // Should be reading from the last element in the buffer
-        let index = (receiver.channel.wi.get() - receiver.channel.size + 1) % receiver.channel.size;
+        let index = (receiver.buffer.wi.get() - receiver.buffer.size + 1) % receiver.buffer.size;
 
-        assert_eq!(*SwapSlot::load(&receiver.channel.buffer[index]).unwrap(), 7);
+        assert_eq!(*SwapSlot::load(&receiver.buffer.buffer[index]).unwrap(), 7);
         assert_eq!(*receiver.try_recv().unwrap(), 7);
 
         // Cloned receiver start reading where the original receiver left off
@@ -252,12 +244,12 @@ mod test {
         for i in 0..3 {
             sender.broadcast(i).unwrap();
         }
-        assert_eq!(sender.channel.wi.get(), 3);
+        assert_eq!(sender.buffer.wi.get(), 3);
         assert_eq!(receiver.ri.get(), 0);
 
         // Inserts the value 3, but does not increment the index.
         SwapSlot::store(
-            &sender.channel.buffer[sender.channel.wi.get() % sender.channel.size],
+            &sender.buffer.buffer[sender.buffer.wi.get() % sender.buffer.size],
             3,
         );
         // Receiver still expects the oldest value in buffer to be returned.
@@ -266,7 +258,7 @@ mod test {
         receiver.ri.set(0);
 
         // sender index is incremented
-        sender.channel.wi.inc();
+        sender.buffer.wi.inc();
         assert_eq!(*receiver.try_recv().unwrap(), 1);
 
         // reset receiver index
@@ -274,7 +266,7 @@ mod test {
 
         // Inserts the value 4, but does not increment the index.
         SwapSlot::store(
-            &sender.channel.buffer[sender.channel.wi.get() % sender.channel.size],
+            &sender.buffer.buffer[sender.buffer.wi.get() % sender.buffer.size],
             4,
         );
         // Receiver still expects the oldest value in buffer to be returned.
@@ -285,7 +277,7 @@ mod test {
     fn writer_overflows_pass_usize_max_less_then_size() {
         let (sender, receiver) = bounded(3);
         // set Sender wi index to usize::MAX - 3
-        sender.channel.wi.set(usize::max_value() - 3);
+        sender.buffer.wi.set(usize::max_value() - 3);
         // fill buffer so that reader can read oldest value in buffer (1,2,3)
         for i in 1..4 {
             sender.broadcast(i).unwrap();
@@ -294,7 +286,7 @@ mod test {
         assert_eq!(*receiver.try_recv().unwrap(), 2);
 
         // wi should be at usize::max_value()
-        assert_eq!(sender.channel.wi.get(), usize::max_value());
+        assert_eq!(sender.buffer.wi.get(), usize::max_value());
         // ri should be at usize::max_value() -1
         assert_eq!(receiver.ri.get(), usize::max_value() - 1);
 
@@ -302,7 +294,7 @@ mod test {
         for i in 4..6 {
             sender.broadcast(i).unwrap();
         }
-        assert_eq!(sender.channel.wi.get(), 1);
+        assert_eq!(sender.buffer.wi.get(), 1);
         // receiver should be able to receive 3
         assert_eq!(*receiver.try_recv().unwrap(), 3);
         // ri should be at usize::max_value()
@@ -313,7 +305,7 @@ mod test {
     fn writer_overflows_pass_usize_max_more_then_size() {
         let (sender, receiver) = bounded(3);
         // set Sender wi index to usize::MAX - 3
-        sender.channel.wi.set(usize::max_value() - 3);
+        sender.buffer.wi.set(usize::max_value() - 3);
         // fill buffer so that reader can read oldest value in buffer (1,2,3)
         for i in 1..4 {
             sender.broadcast(i).unwrap();
@@ -322,7 +314,7 @@ mod test {
         assert_eq!(*receiver.try_recv().unwrap(), 2);
 
         // wi should be at usize::max_value()
-        assert_eq!(sender.channel.wi.get(), usize::max_value());
+        assert_eq!(sender.buffer.wi.get(), usize::max_value());
         // ri should be at usize::max_value() -1
         assert_eq!(receiver.ri.get(), usize::max_value() - 1);
 
@@ -330,7 +322,7 @@ mod test {
         for i in 4..10 {
             sender.broadcast(i).unwrap();
         }
-        assert_eq!(sender.channel.wi.get(), 5);
+        assert_eq!(sender.buffer.wi.get(), 5);
 
         // before calling try_recv() ri should be at usize::max_value() - 1
         assert_eq!(receiver.ri.get(), usize::max_value() - 1);
@@ -385,11 +377,11 @@ mod test {
         let (sender, receiver) = bounded(1);
         assert!(sender.is_empty());
         assert!(receiver.is_empty());
-        assert!(sender.channel.is_empty());
+        assert!(sender.buffer.is_empty());
         sender.broadcast(1).unwrap();
         assert!(!sender.is_empty());
         assert!(!receiver.is_empty());
-        assert!(!sender.channel.is_empty());
+        assert!(!sender.buffer.is_empty());
     }
 
     #[test]
