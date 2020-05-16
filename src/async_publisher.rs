@@ -1,8 +1,8 @@
-use crate::piper::event::Event;
 use crate::publisher::Publisher;
 use crate::ring_buffer::SendError;
 use crate::swap_slot::SwapSlot;
 // use piper::Event;
+use event_listener::Event;
 use futures_core::task::{self, Poll};
 use futures_sink::Sink;
 use std::pin::Pin;

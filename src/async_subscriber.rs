@@ -1,7 +1,7 @@
-use crate::piper::event::{Event, EventListener};
 use crate::ring_buffer::TryRecvError;
 use crate::subscriber::Subscriber;
 use crate::swap_slot::SwapSlot;
+use event_listener::{Event, EventListener};
 //use piper::{Event, EventListener};
 use futures_core::{
     future::Future,

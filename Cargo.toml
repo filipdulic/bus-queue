@@ -13,7 +13,7 @@ edition = "2018"
 arc-swap = {version = "0.4.6", optional = true}
 futures-core = "0.3.5"
 futures-sink = "0.3.5"
-# piper = {git = "https://github.com/stjepang/piper.git"}
+event-listener = "1.0.0"
 # conc = {version="0.5.1", optional = true}
 
 [dev-dependencies]

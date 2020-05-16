@@ -86,7 +86,6 @@ mod async_publisher;
 mod async_subscriber;
 mod atomic_counter;
 pub mod flavors;
-mod piper;
 mod publisher;
 mod ring_buffer;
 mod subscriber;
@@ -122,7 +121,7 @@ pub fn async_bounded<T, S: SwapSlot<T>>(
     async_publisher::AsyncPublisher<T, S>,
     async_subscriber::AsyncSubscriber<T, S>,
 ) {
-    use piper::event::Event;
+    use event_listener::Event;
     use std::sync::Arc;
     let (publisher, subscriber) = bounded(size);
     let event = Arc::new(Event::new());
