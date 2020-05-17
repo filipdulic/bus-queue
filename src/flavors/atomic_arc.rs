@@ -3,19 +3,23 @@ use crate::atomic::atomic_arc::AtomicArc;
 use crate::{async_publisher, async_subscriber, publisher, subscriber, SwapSlot};
 use std::sync::Arc;
 
-pub type Slot<T> = AtomicArc<T>;
+pub struct Slot<T> {
+    atomic_arc: AtomicArc<T>,
+}
 
-impl<T> SwapSlot<T> for AtomicArc<T> {
+impl<T> SwapSlot<T> for Slot<T> {
     fn store(&self, item: T) {
-        self.set(Some(Arc::new(item)));
+        self.atomic_arc.set(Some(Arc::new(item)));
     }
 
     fn load(&self) -> Option<Arc<T>> {
-        self.get().clone_inner()
+        self.atomic_arc.get().clone_inner()
     }
 
     fn none() -> Self {
-        AtomicArc::new(None)
+        Slot {
+            atomic_arc: AtomicArc::new(None),
+        }
     }
 }
 
@@ -35,32 +39,32 @@ pub fn async_bounded<T>(size: usize) -> (AsyncPublisher<T>, AsyncSubscriber<T>) 
 
 #[cfg(test)]
 mod test {
-    use crate::atomic::atomic_arc::AtomicArc;
+    use crate::flavors::atomic_arc::Slot;
     use crate::swap_slot::SwapSlot;
     use std::sync::Arc;
 
     #[test]
     fn test_atomicarc_none() {
-        let item: AtomicArc<i32> = AtomicArc::none();
+        let slot: Slot<()> = Slot::none();
 
-        assert_eq!(item.get().clone_inner(), None);
+        assert_eq!(slot.atomic_arc.get().clone_inner(), None);
     }
 
     #[test]
     fn test_atomicarc_store() {
-        let item = AtomicArc::none();
+        let slot = Slot::none();
 
-        SwapSlot::store(&item, 5);
+        slot.store(5);
 
-        assert_eq!(item.get().clone_inner(), Some(Arc::new(5)));
+        assert_eq!(slot.atomic_arc.get().clone_inner(), Some(Arc::new(5)));
     }
 
     #[test]
     fn test_atomicarc_load() {
-        let item = AtomicArc::none();
-        SwapSlot::store(&item, 10);
+        let slot = Slot::none();
+        slot.store(10);
 
-        let arc = SwapSlot::load(&item);
+        let arc = slot.load();
 
         assert_eq!(arc, Some(Arc::new(10)));
         assert_eq!(Arc::strong_count(&arc.unwrap()), 2)

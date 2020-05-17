@@ -2,20 +2,23 @@
 use crate::{async_publisher, async_subscriber, publisher, subscriber, SwapSlot};
 use std::sync::{Arc, RwLock};
 
-pub type Slot<T> = RwSlot<T>;
-type RwSlot<T> = RwLock<Option<Arc<T>>>;
+pub struct Slot<T> {
+    lock: RwLock<Option<Arc<T>>>,
+}
 
-impl<T> SwapSlot<T> for RwSlot<T> {
+impl<T> SwapSlot<T> for Slot<T> {
     fn store(&self, item: T) {
-        *self.write().unwrap() = Some(Arc::new(item));
+        *self.lock.write().unwrap() = Some(Arc::new(item));
     }
 
     fn load(&self) -> Option<Arc<T>> {
-        self.read().unwrap().clone()
+        self.lock.read().unwrap().clone()
     }
 
     fn none() -> Self {
-        Self::new(None)
+        Slot {
+            lock: RwLock::new(None),
+        }
     }
 }
 
@@ -35,32 +38,32 @@ pub fn async_bounded<T>(size: usize) -> (AsyncPublisher<T>, AsyncSubscriber<T>) 
 
 #[cfg(test)]
 mod test {
-    use crate::flavors::rw_lock::RwSlot;
+    use crate::flavors::rw_lock::Slot;
     use crate::swap_slot::SwapSlot;
     use std::sync::Arc;
 
     #[test]
     fn test_rwslot_none() {
-        let item: RwSlot<i32> = RwSlot::none();
+        let slot: Slot<()> = Slot::none();
 
-        assert_eq!(item.read().unwrap().clone(), None);
+        assert_eq!(slot.lock.read().unwrap().clone(), None);
     }
 
     #[test]
     fn test_rwslot_store() {
-        let item = RwSlot::none();
+        let slot = Slot::none();
 
-        SwapSlot::store(&item, 5);
+        slot.store(5);
 
-        assert_eq!(item.read().unwrap().clone(), Some(Arc::new(5)));
+        assert_eq!(slot.lock.read().unwrap().clone(), Some(Arc::new(5)));
     }
 
     #[test]
     fn test_rwslot_load() {
-        let item = RwSlot::none();
-        SwapSlot::store(&item, 10);
+        let slot = Slot::none();
+        slot.store(10);
 
-        let arc = SwapSlot::load(&item);
+        let arc = slot.load();
 
         assert_eq!(arc, Some(Arc::new(10)));
         assert_eq!(Arc::strong_count(&arc.unwrap()), 2)
