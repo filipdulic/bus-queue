@@ -1,0 +1,23 @@
+name: PlantUml
+on:
+  push:
+    paths:
+      - 'docs/uml/**'
+  pull_request:
+    paths:
+      - 'docs/uml/**'
+jobs:
+  check:
+    name: Render to Wiki
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Render PlantUML to wiki
+        uses: frederikheld/render-plantuml-to-wiki-action@v1.0.1
+        with:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          INPUT_DIR: 'docs/uml'
+          OUTPUT_DIR: 'uml_diagrams'
+
