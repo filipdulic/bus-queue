@@ -1,0 +1,40 @@
+@startuml RingBuffer
+state RB as "RingBuffer" {
+    state B as "Buffer" {
+        state S3 as "3" {
+        }
+        state S2 as "2" {
+        }
+        state S1 as "1" {
+        }
+        state S0 as "0" {
+        }
+        
+        S3:Some(4)
+        S2:Some(3)
+        S1:Some(2)
+        S0:Some(1)
+        S0 -[hidden]right-> S1
+        S1 -[hidden]right-> S2
+        S2 -[hidden]right-> S3
+    }
+    RB: len : 3
+    RB: size : 4
+    RB: wi : 4
+}
+
+state P as "Publisher" {
+    P: Arc<RingBuffer>
+}
+P ---> S0
+
+state Sub1 as "Subscriber 1"
+state Sub2 as "Subscriber 2"
+Sub1: Arc<RingBuffer>
+Sub1: ri: 0
+Sub2: Arc<RingBuffer>
+Sub2: ri: 0
+
+Sub1 -up--> S0
+Sub2 -up--> S0
+@enduml

@@ -1,0 +1,20 @@
+@startuml TryRecv
+skinparam ConditionEndStyle hline
+!pragma useVerticalIf on
+partition try_recv(**ri**)
+:**ri**.get()<
+:**wi**.get()<
+
+if(**wi** == **ri**) then (**true** == **Empty**)
+stop
+endif
+repeat :**ri**.get()<
+  :**slot** = **buffer**[**ri** % **size**] <
+  :**val** = **slot**.load() <
+  :**wi**.get() <
+backward:**wi**.get()\n**ri**.set(**wi** - (**size** - (**1** + **skip_items**)))>
+repeat while (**wi** - **ri** >= **size**) is (true) not (false)
+:**ri**.inc()>
+stop
+note right: **return** **val**
+@enduml

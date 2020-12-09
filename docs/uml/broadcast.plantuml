@@ -1,0 +1,7 @@
+@startuml Broadcast
+partition broadcast(**object**)
+:**wi**.get();
+:**slot** = **buffer**[**wi** % **size**];
+:**slot**.store(**object**);
+:**wi**.inc();
+@enduml
