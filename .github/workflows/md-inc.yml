@@ -3,7 +3,7 @@ on: [push,workflow_dispatch]
 
 jobs:
   check:
-    name: Render to Wiki
+    name: Update markdown
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
