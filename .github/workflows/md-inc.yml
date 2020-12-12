@@ -1,0 +1,15 @@
+name: Markdown Include
+on: [push,workflow_dispatch]
+
+jobs:
+  check:
+    name: Render to Wiki
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Update code in wiki
+        uses: filipdulic/markdown-include-wiki-action@v1
+        with:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
