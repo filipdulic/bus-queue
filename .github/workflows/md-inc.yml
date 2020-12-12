@@ -10,6 +10,6 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Update code in wiki
-        uses: filipdulic/markdown-include-wiki-action@v1
+        uses: filipdulic/markdown-include-wiki-action@v1.0.1
         with:
           WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
