@@ -6,7 +6,7 @@ use std::fmt::Debug;
 pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
 #[derive(Debug)]
-pub struct RingBuffer<T, S: SwapSlot<T>> {
+pub struct RingBuffer<T,I, S: SwapSlot<T,I>> {
     /// Circular buffer
     buffer: Vec<S>,
     /// Size of the buffer
@@ -17,10 +17,10 @@ pub struct RingBuffer<T, S: SwapSlot<T>> {
     sub_count: AtomicCounter,
     /// true if this sender is still available
     is_available: AtomicBool,
-    ph: std::marker::PhantomData<T>,
+    ph_t: std::marker::PhantomData<T>,
+    ph_i: std::marker::PhantomData<I>,
 }
-
-impl<T, S: SwapSlot<T>> RingBuffer<T, S> {
+impl<T, I, S: SwapSlot<T, I>> RingBuffer<T, I, S> {
     pub fn new(size: usize) -> Self {
         let size = size + 1;
         let mut buffer = Vec::with_capacity(size);
@@ -33,14 +33,15 @@ impl<T, S: SwapSlot<T>> RingBuffer<T, S> {
             wi: AtomicCounter::new(0),
             sub_count: AtomicCounter::new(1),
             is_available: AtomicBool::new(true),
-            ph: std::marker::PhantomData,
+            ph_t: std::marker::PhantomData,
+            ph_i: std::marker::PhantomData,
         }
     }
     /// Publishes values to the circular buffer at wi % size
     ///
     /// # Arguments
     /// * `object` - owned object to be published
-    pub fn broadcast(&self, object: T) -> Result<(), SendError<T>> {
+    pub fn broadcast(&self, object: I) -> Result<(), SendError<I>> {
         if self.sub_count.get() == 0 {
             return Err(SendError(object));
         }
@@ -118,7 +119,7 @@ impl<T, S: SwapSlot<T>> RingBuffer<T, S> {
 }
 
 /// Drop trait is used to let subscribers know that publisher is no longer available.
-impl<T, S: SwapSlot<T>> Drop for RingBuffer<T, S> {
+impl<T, U, S: SwapSlot<T, U>> Drop for RingBuffer<T, U, S> {
     fn drop(&mut self) {
         self.close();
     }
@@ -220,7 +221,7 @@ mod test {
         // Should be reading from the last element in the buffer
         let index = (receiver.buffer.wi.get() - receiver.buffer.size + 1) % receiver.buffer.size;
 
-        assert_eq!(*SwapSlot::load(&receiver.buffer.buffer[index]).unwrap(), 7);
+        assert_eq!(*SwapSlot::<i32,i32>::load(&receiver.buffer.buffer[index]).unwrap(), 7);
         assert_eq!(*receiver.try_recv().unwrap(), 7);
 
         // Cloned receiver start reading where the original receiver left off

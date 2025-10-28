@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 /// Trait required by implementers of syncing primitives.
-pub trait SwapSlot<T> {
+pub trait SwapSlot<T, I> {
     /// Creates a new Arc around item and stores it,
     /// dropping the previously held item's Arc.
-    fn store(&self, item: T);
+    fn store(&self, item: I);
 
     /// Returns a clone of the held Arc,
     /// incrementing the ref count atomically

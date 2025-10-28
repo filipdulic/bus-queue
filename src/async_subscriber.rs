@@ -11,14 +11,14 @@ use futures_core::{
 use std::pin::Pin;
 use std::sync::Arc;
 
-pub struct AsyncSubscriber<T, S: SwapSlot<T>> {
-    pub(super) subscriber: Subscriber<T, S>,
+pub struct AsyncSubscriber<T, I, S: SwapSlot<T, I>> {
+    pub(super) subscriber: Subscriber<T, I, S>,
     pub(super) event: Arc<Event>,
     pub(super) listener: Option<EventListener>,
 }
 
-impl<T, S: SwapSlot<T>> From<(Subscriber<T, S>, Arc<Event>)> for AsyncSubscriber<T, S> {
-    fn from(input: (Subscriber<T, S>, Arc<Event>)) -> Self {
+impl<T, I, S: SwapSlot<T, I>> From<(Subscriber<T, I, S>, Arc<Event>)> for AsyncSubscriber<T, I, S> {
+    fn from(input: (Subscriber<T, I, S>, Arc<Event>)) -> Self {
         Self {
             subscriber: input.0,
             event: input.1,
@@ -27,13 +27,13 @@ impl<T, S: SwapSlot<T>> From<(Subscriber<T, S>, Arc<Event>)> for AsyncSubscriber
     }
 }
 
-impl<T, S: SwapSlot<T>> std::fmt::Debug for AsyncSubscriber<T, S> {
+impl<T, I, S: SwapSlot<T, I>> std::fmt::Debug for AsyncSubscriber<T, I, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Subscriber").finish()
     }
 }
 
-impl<T, S: SwapSlot<T>> AsyncSubscriber<T, S> {
+impl<T, I, S: SwapSlot<T, I>> AsyncSubscriber<T, I, S> {
     #[allow(dead_code)]
     pub fn set_skip_items(&mut self, skip_items: usize) {
         self.subscriber.set_skip_items(skip_items);
@@ -50,7 +50,7 @@ impl<T, S: SwapSlot<T>> AsyncSubscriber<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> Stream for AsyncSubscriber<T, S> {
+impl<T, I, S: SwapSlot<T, I>> Stream for AsyncSubscriber<T, I, S> {
     type Item = Arc<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
@@ -91,7 +91,7 @@ impl<T, S: SwapSlot<T>> Stream for AsyncSubscriber<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> Clone for AsyncSubscriber<T, S> {
+impl<T, I, S: SwapSlot<T, I>> Clone for AsyncSubscriber<T, I, S> {
     fn clone(&self) -> Self {
         Self {
             subscriber: self.subscriber.clone(),
@@ -101,10 +101,10 @@ impl<T, S: SwapSlot<T>> Clone for AsyncSubscriber<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> PartialEq for AsyncSubscriber<T, S> {
-    fn eq(&self, other: &AsyncSubscriber<T, S>) -> bool {
+impl<T, I, S: SwapSlot<T, I>> PartialEq for AsyncSubscriber<T, I, S> {
+    fn eq(&self, other: &AsyncSubscriber<T, I, S>) -> bool {
         self.subscriber == other.subscriber
     }
 }
 
-impl<T, S: SwapSlot<T>> Eq for AsyncSubscriber<T, S> {}
+impl<T, I, S: SwapSlot<T, I>> Eq for AsyncSubscriber<T, I, S> {}

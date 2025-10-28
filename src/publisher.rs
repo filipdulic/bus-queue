@@ -3,17 +3,17 @@ use crate::swap_slot::SwapSlot;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct Publisher<T, S: SwapSlot<T>> {
+pub struct Publisher<T, I, S: SwapSlot<T, I>> {
     /// Shared reference to the channel
-    pub(super) buffer: Arc<RingBuffer<T, S>>,
+    pub(super) buffer: Arc<RingBuffer<T, I, S>>,
 }
 
-impl<T, S: SwapSlot<T>> Publisher<T, S> {
+impl<T, I, S: SwapSlot<T, I>> Publisher<T, I, S> {
     /// Publishes values to the circular buffer at wi % size
     ///
     /// # Arguments
     /// * `object` - owned object to be published
-    pub fn broadcast(&self, object: T) -> Result<(), SendError<T>> {
+    pub fn broadcast(&self, object: I) -> Result<(), SendError<I>> {
         self.buffer.broadcast(object)
     }
 
@@ -33,8 +33,8 @@ impl<T, S: SwapSlot<T>> Publisher<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for Publisher<T, S> {
-    fn from(arc_channel: Arc<RingBuffer<T, S>>) -> Self {
+impl<T, I, S: SwapSlot<T, I>> From<Arc<RingBuffer<T, I, S>>> for Publisher<T, I,S> {
+    fn from(arc_channel: Arc<RingBuffer<T,I, S>>) -> Self {
         Self {
             buffer: arc_channel,
         }
@@ -42,16 +42,16 @@ impl<T, S: SwapSlot<T>> From<Arc<RingBuffer<T, S>>> for Publisher<T, S> {
 }
 
 /// Drop trait is used to let subscribers know that publisher is no longer available.
-impl<T, S: SwapSlot<T>> Drop for Publisher<T, S> {
+impl<T, I, S: SwapSlot<T, I>> Drop for Publisher<T, I, S> {
     fn drop(&mut self) {
         self.close();
     }
 }
 
-impl<T, S: SwapSlot<T>> PartialEq for Publisher<T, S> {
-    fn eq(&self, other: &Publisher<T, S>) -> bool {
+impl<T, I, S: SwapSlot<T, I>> PartialEq for Publisher<T, I, S> {
+    fn eq(&self, other: &Publisher<T, I, S>) -> bool {
         Arc::ptr_eq(&self.buffer, &other.buffer)
     }
 }
 
-impl<T, S: SwapSlot<T>> Eq for Publisher<T, S> {}
+impl<T, I, S: SwapSlot<T, I>> Eq for Publisher<T, I, S> {}

@@ -91,6 +91,7 @@ mod ring_buffer;
 mod subscriber;
 mod swap_slot;
 
+use std::sync::Arc;
 pub use crate::async_publisher::AsyncPublisher;
 pub use crate::async_subscriber::AsyncSubscriber;
 pub use crate::publisher::Publisher;
@@ -104,9 +105,9 @@ mod atomic;
 pub use atomic_counter::AtomicCounter;
 
 /// Function used to create and initialise a (Sender, Receiver) tuple.
-pub fn bounded<T, S: SwapSlot<T>>(
+pub fn bounded<T, I, S: SwapSlot<T, I>>(
     size: usize,
-) -> (publisher::Publisher<T, S>, subscriber::Subscriber<T, S>) {
+) -> (publisher::Publisher<T, I, S>, subscriber::Subscriber<T, I, S>) {
     use std::sync::Arc;
     let arc_channel = Arc::new(RingBuffer::new(size));
     (
@@ -115,11 +116,11 @@ pub fn bounded<T, S: SwapSlot<T>>(
     )
 }
 
-pub fn async_bounded<T, S: SwapSlot<T>>(
+pub fn async_bounded<T, I, S: SwapSlot<T, I>>(
     size: usize,
 ) -> (
-    async_publisher::AsyncPublisher<T, S>,
-    async_subscriber::AsyncSubscriber<T, S>,
+    async_publisher::AsyncPublisher<T, I, S>,
+    async_subscriber::AsyncSubscriber<T, I, S>,
 ) {
     use event_listener::Event;
     use std::sync::Arc;

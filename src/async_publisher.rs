@@ -8,13 +8,13 @@ use futures_sink::Sink;
 use std::pin::Pin;
 use std::sync::Arc;
 
-pub struct AsyncPublisher<T, S: SwapSlot<T>> {
-    pub(super) publisher: Publisher<T, S>,
+pub struct AsyncPublisher<T, I, S: SwapSlot<T, I>> {
+    pub(super) publisher: Publisher<T, I, S>,
     pub(super) event: Arc<Event>,
 }
 
-impl<T, S: SwapSlot<T>> From<(Publisher<T, S>, Arc<Event>)> for AsyncPublisher<T, S> {
-    fn from(input: (Publisher<T, S>, Arc<Event>)) -> Self {
+impl<T, I, S: SwapSlot<T, I>> From<(Publisher<T, I, S>, Arc<Event>)> for AsyncPublisher<T, I, S> {
+    fn from(input: (Publisher<T, I, S>, Arc<Event>)) -> Self {
         Self {
             publisher: input.0,
             event: input.1,
@@ -22,8 +22,8 @@ impl<T, S: SwapSlot<T>> From<(Publisher<T, S>, Arc<Event>)> for AsyncPublisher<T
     }
 }
 
-impl<T, S: SwapSlot<T>> Sink<T> for AsyncPublisher<T, S> {
-    type Error = SendError<T>;
+impl<T, I, S: SwapSlot<T, I>> Sink<I> for AsyncPublisher<T, I, S> {
+    type Error = SendError<I>;
 
     fn poll_ready(
         self: Pin<&mut Self>,
@@ -32,7 +32,7 @@ impl<T, S: SwapSlot<T>> Sink<T> for AsyncPublisher<T, S> {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
         self.publisher.broadcast(item).and_then(|_| Ok(()))
     }
 
@@ -53,17 +53,17 @@ impl<T, S: SwapSlot<T>> Sink<T> for AsyncPublisher<T, S> {
     }
 }
 
-impl<T, S: SwapSlot<T>> PartialEq for AsyncPublisher<T, S> {
-    fn eq(&self, other: &AsyncPublisher<T, S>) -> bool {
+impl<T, I, S: SwapSlot<T, I>> PartialEq for AsyncPublisher<T, I, S> {
+    fn eq(&self, other: &AsyncPublisher<T, I, S>) -> bool {
         self.publisher == other.publisher
     }
 }
 
-impl<T, S: SwapSlot<T>> Drop for AsyncPublisher<T, S> {
+impl<T, I, S: SwapSlot<T, I>> Drop for AsyncPublisher<T, I, S> {
     fn drop(&mut self) {
         self.publisher.close();
         self.event.notify_all();
     }
 }
 
-impl<T, S: SwapSlot<T>> Eq for AsyncPublisher<T, S> {}
+impl<T, I, S: SwapSlot<T, I>> Eq for AsyncPublisher<T, I, S> {}
