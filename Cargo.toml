@@ -26,7 +26,6 @@ default = ["arcswap", "rwlock"]
 arcswap = ["arc-swap"]
 # conc-atomic = ["conc"]
 rwlock = []
-atomic-arc = []
 
 [[example]]
 name = "raw-simple"
