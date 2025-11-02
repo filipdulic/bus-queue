@@ -33,7 +33,7 @@ impl<T, S: SwapSlot<T>> Sink<T> for AsyncPublisher<T, S> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        self.publisher.broadcast(item).and_then(|_| Ok(()))
+        self.publisher.broadcast(item).map(|_| ())
     }
 
     fn poll_flush(

@@ -3,7 +3,7 @@ use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
 // Use std mpsc's error types as our own
 use crate::swap_slot::SwapSlot;
 use std::fmt::Debug;
-pub use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError, TryRecvError};
+pub use std::sync::mpsc::{SendError, TryRecvError};
 
 #[derive(Debug)]
 pub struct RingBuffer<T, S: SwapSlot<T>> {
@@ -164,7 +164,7 @@ mod test {
     fn bounded_channel_no_sender() {
         let (sender, receiver) = bounded::<()>(1);
         drop(sender);
-        assert_eq!(receiver.is_sender_available(), false);
+        assert!(!receiver.is_sender_available());
     }
 
     #[test]
@@ -277,8 +277,8 @@ mod test {
     fn writer_overflows_pass_usize_max_less_then_size() {
         let (sender, receiver) = bounded(3);
         // set Sender wi index to usize::MAX - 3
-        sender.buffer.wi.set(usize::max_value() - 3);
-        // fill buffer so that reader can read oldest value in buffer (1,2,3)
+        sender.buffer.wi.set(usize::MAX - 3);
+        // fill buffer so that reader can read the oldest value in buffer (1,2,3)
         for i in 1..4 {
             sender.broadcast(i).unwrap();
         }
@@ -286,9 +286,9 @@ mod test {
         assert_eq!(*receiver.try_recv().unwrap(), 2);
 
         // wi should be at usize::max_value()
-        assert_eq!(sender.buffer.wi.get(), usize::max_value());
+        assert_eq!(sender.buffer.wi.get(), usize::MAX);
         // ri should be at usize::max_value() -1
-        assert_eq!(receiver.ri.get(), usize::max_value() - 1);
+        assert_eq!(receiver.ri.get(), usize::MAX - 1);
 
         // broadcast 2 more items (4,5) so wi is at 1
         for i in 4..6 {
@@ -298,15 +298,15 @@ mod test {
         // receiver should be able to receive 3
         assert_eq!(*receiver.try_recv().unwrap(), 3);
         // ri should be at usize::max_value()
-        assert_eq!(receiver.ri.get(), usize::max_value());
+        assert_eq!(receiver.ri.get(), usize::MAX);
     }
 
     #[test]
     fn writer_overflows_pass_usize_max_more_then_size() {
         let (sender, receiver) = bounded(3);
         // set Sender wi index to usize::MAX - 3
-        sender.buffer.wi.set(usize::max_value() - 3);
-        // fill buffer so that reader can read oldest value in buffer (1,2,3)
+        sender.buffer.wi.set(usize::MAX - 3);
+        // fill buffer so that reader can read the oldest value in buffer (1,2,3)
         for i in 1..4 {
             sender.broadcast(i).unwrap();
         }
@@ -314,9 +314,9 @@ mod test {
         assert_eq!(*receiver.try_recv().unwrap(), 2);
 
         // wi should be at usize::max_value()
-        assert_eq!(sender.buffer.wi.get(), usize::max_value());
+        assert_eq!(sender.buffer.wi.get(), usize::MAX);
         // ri should be at usize::max_value() -1
-        assert_eq!(receiver.ri.get(), usize::max_value() - 1);
+        assert_eq!(receiver.ri.get(), usize::MAX - 1);
 
         // broadcast 6 more items (4,5,6,7,8,9) so wi is at 5
         for i in 4..10 {
@@ -325,7 +325,7 @@ mod test {
         assert_eq!(sender.buffer.wi.get(), 5);
 
         // before calling try_recv() ri should be at usize::max_value() - 1
-        assert_eq!(receiver.ri.get(), usize::max_value() - 1);
+        assert_eq!(receiver.ri.get(), usize::MAX - 1);
         // receiver should be able to receive 7
         assert_eq!(*receiver.try_recv().unwrap(), 7);
         // ri should be updated to 3

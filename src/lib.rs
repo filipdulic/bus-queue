@@ -98,9 +98,6 @@ pub use crate::subscriber::Subscriber;
 pub use ring_buffer::RingBuffer;
 pub use swap_slot::SwapSlot;
 
-#[cfg(feature = "atomic-arc")]
-mod atomic;
-
 pub use atomic_counter::AtomicCounter;
 
 /// Function used to create and initialise a (Sender, Receiver) tuple.
