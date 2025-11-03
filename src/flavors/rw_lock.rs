@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::{async_publisher, async_subscriber, publisher, subscriber, SwapSlot};
+use crate::{SwapSlot, async_publisher, async_subscriber, publisher, subscriber};
 use std::sync::{Arc, RwLock};
 
 pub struct Slot<T> {

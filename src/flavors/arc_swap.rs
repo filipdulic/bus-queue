@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::{async_publisher, async_subscriber, publisher, subscriber, SwapSlot};
+use crate::{SwapSlot, async_publisher, async_subscriber, publisher, subscriber};
 use arc_swap::ArcSwapOption;
 use std::sync::Arc;
 

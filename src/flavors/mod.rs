@@ -16,12 +16,12 @@ mod allocation_tests {
 
     thread_local! {
         // Each OS thread gets its own counter.
-        static ALLOCS_THIS_THREAD: Cell<usize> = Cell::new(0);
+        static ALLOCS_THIS_THREAD: Cell<usize> = const { Cell::new(0) };
     }
 
     unsafe impl GlobalAlloc for CountingAlloc {
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-            let ptr = System.alloc(layout);
+            let ptr = unsafe { System.alloc(layout) };
             if !ptr.is_null() {
                 // Only bump the counter for the *current* thread.
                 ALLOCS_THIS_THREAD.with(|c| c.set(c.get() + 1));
@@ -30,7 +30,7 @@ mod allocation_tests {
         }
 
         unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-            System.dealloc(ptr, layout);
+            unsafe { System.dealloc(ptr, layout) };
         }
     }
 

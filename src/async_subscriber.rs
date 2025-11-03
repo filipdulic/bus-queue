@@ -4,9 +4,9 @@ use crate::swap_slot::SwapSlot;
 use event_listener::{Event, EventListener};
 //use piper::{Event, EventListener};
 use futures_core::{
+    Stream,
     future::Future,
     task::{self, Poll},
-    Stream,
 };
 use std::pin::Pin;
 use std::sync::Arc;
