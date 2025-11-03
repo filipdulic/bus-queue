@@ -4,7 +4,7 @@ use std::sync::Arc;
 pub trait SwapSlot<T> {
     /// Creates a new Arc around item and stores it,
     /// dropping the previously held item's Arc.
-    fn store(&self, item: T);
+    fn store(&self, item: impl Into<Arc<T>>);
 
     /// Returns a clone of the held Arc,
     /// incrementing the ref count atomically
