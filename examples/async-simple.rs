@@ -1,6 +1,6 @@
 use bus_queue::flavors::arc_swap::async_bounded;
 use futures::executor::block_on;
-use futures::stream::{iter, StreamExt};
+use futures::stream::{StreamExt, iter};
 
 fn main() {
     let (publisher, subscriber1) = async_bounded(10);

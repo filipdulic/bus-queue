@@ -7,19 +7,20 @@ license = "Apache-2.0/MIT"
 keywords = ["pubsub", "lock-free", "queue","async","futures"]
 repository = "https://github.com/filipdulic/bus-queue"
 readme = "README.md"
-edition = "2018"
+edition = "2024"
 
 [dependencies]
-arc-swap = {version = "0.4.6", optional = true}
-futures-core = "0.3.5"
-futures-sink = "0.3.5"
-event-listener = "1.0.0"
+arc-swap = {version = "1.7.1", optional = true}
+futures-core = "0.3.31"
+futures-sink = "0.3.31"
+event-listener = "5.4.1"
 # conc = {version="0.5.1", optional = true}
 
 [dev-dependencies]
-rand = "0.7.3"
-futures-test = "0.3.5"
-futures = {version = "0.3.5", features = ["thread-pool"]}
+# rand = "0.10.0-rc.0"
+futures-test = "0.3.31"
+futures = {version = "0.3.31", features = ["thread-pool"]}
+serial_test = "3.2.0"
 
 [features]
 default = ["arcswap", "rwlock"]

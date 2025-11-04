@@ -40,7 +40,7 @@ impl<T, S: SwapSlot<T>> Sink<T> for AsyncPublisher<T, S> {
         self: Pin<&mut Self>,
         _: &mut task::Context<'_>,
     ) -> Poll<Result<(), Self::Error>> {
-        self.event.notify_all();
+        self.event.notify(usize::MAX);
         Poll::Ready(Ok(()))
     }
 
@@ -62,7 +62,7 @@ impl<T, S: SwapSlot<T>> PartialEq for AsyncPublisher<T, S> {
 impl<T, S: SwapSlot<T>> Drop for AsyncPublisher<T, S> {
     fn drop(&mut self) {
         self.publisher.close();
-        self.event.notify_all();
+        self.event.notify(usize::MAX);
     }
 }
 

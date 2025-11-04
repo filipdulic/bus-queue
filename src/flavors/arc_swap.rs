@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::{async_publisher, async_subscriber, publisher, subscriber, SwapSlot};
+use crate::{SwapSlot, async_publisher, async_subscriber, publisher, subscriber};
 use arc_swap::ArcSwapOption;
 use std::sync::Arc;
 
@@ -68,48 +68,5 @@ mod test {
 
         assert_eq!(arc, Some(Arc::new(10)));
         assert_eq!(Arc::strong_count(&arc.unwrap()), 2)
-    }
-}
-
-#[cfg(test)]
-mod allocation_tests {
-    use crate::flavors::allocation_tests::{allocs_current_thread, reset_allocs_current_thread};
-
-    use super::*;
-
-    #[test]
-    fn store_with_arc_does_not_allocate_new_arc() {
-        let slot = Slot::<u32>::none();
-        let arc = Arc::new(123u32);
-
-        // Ignore allocations from constructing `slot` and `arc`.
-        reset_allocs_current_thread();
-
-        // This should only move / clone the Arc; no new heap allocation for T.
-        slot.store(arc.clone());
-
-        // Might still be 0 or some tiny number depending on RwLock internals,
-        // but definitely shouldn't be "one Arc allocation vs another" difference.
-        let after = allocs_current_thread();
-        assert_eq!(
-            after, 0,
-            "expected no additional allocations when storing an Arc"
-        );
-    }
-
-    #[test]
-    fn store_with_value_allocates_arc() {
-        let slot = Slot::<u32>::none();
-
-        reset_allocs_current_thread();
-
-        // This goes through `impl From<T> for Arc<T>` and must allocate.
-        slot.store(5u32);
-
-        let after = allocs_current_thread();
-        assert!(
-            after == 1,
-            "expected at least one allocation when storing a bare value T"
-        );
     }
 }

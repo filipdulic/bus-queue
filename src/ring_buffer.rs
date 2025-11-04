@@ -1,5 +1,5 @@
 use crate::atomic_counter::AtomicCounter;
-use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
+use std::sync::{Arc, atomic::AtomicBool, atomic::Ordering};
 // Use std mpsc's error types as our own
 use crate::swap_slot::SwapSlot;
 use std::fmt::Debug;

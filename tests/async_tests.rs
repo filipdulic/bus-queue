@@ -1,6 +1,6 @@
 use bus_queue::flavors::arc_swap::async_bounded;
 // use futures::{executor, pin_mut, task::Poll, task::SpawnExt, FutureExt, SinkExt, StreamExt};
-use futures::{pin_mut, task::Poll, FutureExt, SinkExt};
+use futures::{FutureExt, SinkExt, pin_mut, task::Poll};
 use futures_test::task::noop_context;
 use futures_test::{assert_stream_done, assert_stream_next, assert_stream_pending};
 // use rand::Rng;
